@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 interface StoryDisplayProps {
@@ -11,6 +11,12 @@ interface StoryDisplayProps {
 export default function StoryDisplay({ content, onComplete }: StoryDisplayProps) {
   const [displayedText, setDisplayedText] = useState('');
   const [isComplete, setIsComplete] = useState(false);
+  const onCompleteRef = useRef(onComplete);
+
+  // Update ref when onComplete changes
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   useEffect(() => {
     setDisplayedText('');
@@ -27,17 +33,17 @@ export default function StoryDisplay({ content, onComplete }: StoryDisplayProps)
       } else {
         setIsComplete(true);
         clearInterval(interval);
-        onComplete?.();
+        onCompleteRef.current?.();
       }
     }, 30); // Speed of typing effect
 
     return () => clearInterval(interval);
-  }, [content, onComplete]);
+  }, [content]);
 
   const handleSkip = () => {
     setDisplayedText(content);
     setIsComplete(true);
-    onComplete?.();
+    onCompleteRef.current?.();
   };
 
   return (

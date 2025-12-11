@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useGameStore } from '@/store/game-store';
 import StoryDisplay from '@/components/story-display';
@@ -42,13 +42,13 @@ export default function GamePage() {
     await makeChoice(choice);
   };
 
-  const handleDiceComplete = () => {
+  const handleDiceComplete = useCallback(() => {
     clearDiceRoll();
-  };
+  }, [clearDiceRoll]);
 
-  const handleStoryComplete = () => {
+  const handleStoryComplete = useCallback(() => {
     setShowChoices(true);
-  };
+  }, []);
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 via-black to-gray-900 py-8 px-4">
@@ -121,6 +121,7 @@ export default function GamePage() {
         {/* Story Content */}
         <div className="mb-8">
           <StoryDisplay 
+            key={currentNode.id}
             content={currentNode.content} 
             onComplete={handleStoryComplete}
           />
