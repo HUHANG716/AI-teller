@@ -61,10 +61,20 @@ export function getAllGames(): GameState[] {
     }
     
     const games = JSON.parse(data) as GameState[];
-    storageLogger.debug({ totalGames: games.length }, 'Games loaded');
+    
+    // Migrate old games to include new fields
+    const migratedGames = games.map(game => ({
+      ...game,
+      resources: game.resources || [],
+      maxRounds: game.maxRounds || 15,
+      resourceDefinitions: game.resourceDefinitions || undefined,
+      // goal and ending are optional, so they can be undefined
+    }));
+    
+    storageLogger.debug({ totalGames: migratedGames.length }, 'Games loaded');
     
     // Sort by most recently updated
-    return games.sort((a, b) => b.updatedAt - a.updatedAt);
+    return migratedGames.sort((a, b) => b.updatedAt - a.updatedAt);
   } catch (error) {
     storageLogger.error({ 
       error: error instanceof Error ? error.message : String(error)

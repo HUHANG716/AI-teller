@@ -1,5 +1,5 @@
 // AI service layer supporting multiple Chinese LLM providers
-import { Genre, Character, StoryNode, GenerateStoryResponse, DiceRoll } from './types';
+import { Genre, Character, StoryNode, GenerateStoryResponse, DiceRoll, GameGoal, Resource } from './types';
 import { buildPrompt } from './prompt-templates';
 import { aiLogger, logPerformance } from './logger';
 
@@ -16,6 +16,11 @@ export async function generateStory(params: {
   userInput: string;
   isOpening?: boolean;
   diceRoll?: DiceRoll;
+  goal?: GameGoal;
+  resources?: Resource[];
+  roundNumber?: number;
+  isGoalSelection?: boolean;
+  isEnding?: boolean;
 }): Promise<GenerateStoryResponse> {
   const startTime = Date.now();
   const provider = (process.env.AI_MODEL_PROVIDER || 'openrouter') as AIProvider;
@@ -35,16 +40,16 @@ export async function generateStory(params: {
     
     switch (provider) {
       case 'openrouter':
-        result = await callOpenRouterAPI(params);
+        result = await callOpenRouterAPI(params as any);
         break;
       case 'qwen':
-        result = await callQwenAPI(params);
+        result = await callQwenAPI(params as any);
         break;
       case 'zhipu':
-        result = await callZhipuAPI(params);
+        result = await callZhipuAPI(params as any);
         break;
       case 'wenxin':
-        result = await callWenxinAPI(params);
+        result = await callWenxinAPI(params as any);
         break;
       default:
         throw new Error(`Unknown AI provider: ${provider}`);
@@ -77,6 +82,11 @@ async function callOpenRouterAPI(params: {
   userInput: string;
   isOpening?: boolean;
   diceRoll?: DiceRoll;
+  goal?: GameGoal;
+  resources?: Resource[];
+  roundNumber?: number;
+  isGoalSelection?: boolean;
+  isEnding?: boolean;
 }): Promise<GenerateStoryResponse> {
   const startTime = Date.now();
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -92,14 +102,23 @@ async function callOpenRouterAPI(params: {
     params.history,
     params.userInput,
     params.isOpening,
-    params.diceRoll
+    params.diceRoll,
+    params.roundNumber,
+    params.goal,
+    params.resources,
+    params.isGoalSelection,
+    params.isEnding
   );
   
   aiLogger.info({
     genre: params.genre,
     characterName: params.character.name,
     isOpening: params.isOpening,
-    hasDiceRoll: !!params.diceRoll
+    hasDiceRoll: !!params.diceRoll,
+    hasGoal: !!params.goal,
+    goalDescription: params.goal?.goal?.description,
+    roundNumber: params.roundNumber,
+    isGoalSelection: params.isGoalSelection
   }, 'Starting OpenRouter API call');
 
   // 模型映射
@@ -215,6 +234,11 @@ async function callQwenAPI(params: {
   userInput: string;
   isOpening?: boolean;
   diceRoll?: DiceRoll;
+  goal?: GameGoal;
+  resources?: Resource[];
+  roundNumber?: number;
+  isGoalSelection?: boolean;
+  isEnding?: boolean;
 }): Promise<GenerateStoryResponse> {
   const apiKey = process.env.QWEN_API_KEY;
   
@@ -228,7 +252,12 @@ async function callQwenAPI(params: {
     params.history,
     params.userInput,
     params.isOpening,
-    params.diceRoll
+    params.diceRoll,
+    params.roundNumber,
+    params.goal,
+    params.resources,
+    params.isGoalSelection,
+    params.isEnding
   );
 
   try {
@@ -280,6 +309,11 @@ async function callZhipuAPI(params: {
   userInput: string;
   isOpening?: boolean;
   diceRoll?: DiceRoll;
+  goal?: GameGoal;
+  resources?: Resource[];
+  roundNumber?: number;
+  isGoalSelection?: boolean;
+  isEnding?: boolean;
 }): Promise<GenerateStoryResponse> {
   const apiKey = process.env.ZHIPU_API_KEY;
   
@@ -293,7 +327,12 @@ async function callZhipuAPI(params: {
     params.history,
     params.userInput,
     params.isOpening,
-    params.diceRoll
+    params.diceRoll,
+    params.roundNumber,
+    params.goal,
+    params.resources,
+    params.isGoalSelection,
+    params.isEnding
   );
 
   try {
@@ -340,6 +379,11 @@ async function callWenxinAPI(params: {
   userInput: string;
   isOpening?: boolean;
   diceRoll?: DiceRoll;
+  goal?: GameGoal;
+  resources?: Resource[];
+  roundNumber?: number;
+  isGoalSelection?: boolean;
+  isEnding?: boolean;
 }): Promise<GenerateStoryResponse> {
   const apiKey = process.env.WENXIN_API_KEY;
   const secretKey = process.env.WENXIN_SECRET_KEY;
@@ -367,7 +411,12 @@ async function callWenxinAPI(params: {
     params.history,
     params.userInput,
     params.isOpening,
-    params.diceRoll
+    params.diceRoll,
+    params.roundNumber,
+    params.goal,
+    params.resources,
+    params.isGoalSelection,
+    params.isEnding
   );
 
   try {
@@ -416,11 +465,37 @@ function parseAIResponse(content: string): GenerateStoryResponse {
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
       
-      if (parsed.content && Array.isArray(parsed.choices) && parsed.choices.length === 3) {
-        return {
-          content: parsed.content,
-          choices: parsed.choices,
-        };
+      const response: GenerateStoryResponse = {
+        content: parsed.content || '',
+        choices: parsed.choices || [],
+      };
+      
+      // Add optional fields if present
+      if (parsed.goalOptions) {
+        response.goalOptions = parsed.goalOptions;
+      }
+      if (parsed.resourceDefinitions) {
+        response.resourceDefinitions = parsed.resourceDefinitions;
+      }
+      if (parsed.initialResources) {
+        response.initialResources = parsed.initialResources;
+      }
+      if (parsed.resourceChanges) {
+        response.resourceChanges = parsed.resourceChanges;
+      }
+      if (parsed.goalProgress) {
+        response.goalProgress = parsed.goalProgress;
+      }
+      if (parsed.ending) {
+        response.ending = parsed.ending;
+      }
+      
+      // 第三轮目标选择时 choices 为空数组，但有 goalOptions
+      const hasValidChoices = Array.isArray(response.choices) && response.choices.length > 0;
+      const hasGoalOptions = Array.isArray(response.goalOptions) && response.goalOptions.length > 0;
+
+      if (response.content && (hasValidChoices || hasGoalOptions)) {
+        return response;
       }
     }
     
