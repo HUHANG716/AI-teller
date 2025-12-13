@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'AI说书人 - 你的口袋故事生成器',
+  title: '',
   description: '用AI为你生成永不重复的互动故事',
 }
 

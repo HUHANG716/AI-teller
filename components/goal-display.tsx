@@ -19,13 +19,21 @@ export default function GoalDisplay({ goal }: GoalDisplayProps) {
         </span>
       </div>
       <p className="text-purple-100 mb-3">{goal.goal.description}</p>
+
+      {/* 进度条 */}
       <div className="w-full bg-gray-800 rounded-full h-2.5 mb-2">
         <div
           className="bg-gradient-to-r from-purple-500 to-blue-500 h-2.5 rounded-full transition-all duration-500"
           style={{ width: `${Math.min(goal.progress.percentage, 100)}%` }}
         />
       </div>
-      <p className="text-sm text-purple-300">{goal.progress.description}</p>
+
+      {/* 进度变化原因 */}
+      {goal.progress.reason && (
+        <p className="text-sm text-purple-300 italic">
+          {goal.progress.reason}
+        </p>
+      )}
     </div>
   );
 }

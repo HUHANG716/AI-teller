@@ -1,5 +1,5 @@
 // AI service layer supporting multiple Chinese LLM providers
-import { Genre, Character, StoryNode, GenerateStoryResponse, DiceRoll, GameGoal, Resource } from './types';
+import { Genre, Character, StoryNode, GenerateStoryResponse, DiceRoll, GameGoal, GamePhase, DiceOutcome } from './types';
 import { buildPrompt } from './prompt-templates';
 import { aiLogger, logPerformance } from './logger';
 
@@ -17,8 +17,10 @@ export async function generateStory(params: {
   isOpening?: boolean;
   diceRoll?: DiceRoll;
   goal?: GameGoal;
-  resources?: Resource[];
   roundNumber?: number;
+  maxRounds?: number;
+  phase?: GamePhase;
+  previousOutcome?: DiceOutcome | null;
   isGoalSelection?: boolean;
   isEnding?: boolean;
 }): Promise<GenerateStoryResponse> {
@@ -83,14 +85,16 @@ async function callOpenRouterAPI(params: {
   isOpening?: boolean;
   diceRoll?: DiceRoll;
   goal?: GameGoal;
-  resources?: Resource[];
   roundNumber?: number;
+  maxRounds?: number;
+  phase?: GamePhase;
+  previousOutcome?: DiceOutcome | null;
   isGoalSelection?: boolean;
   isEnding?: boolean;
 }): Promise<GenerateStoryResponse> {
   const startTime = Date.now();
   const apiKey = process.env.OPENROUTER_API_KEY;
-  
+
   if (!apiKey) {
     aiLogger.error('OPENROUTER_API_KEY not configured');
     throw new Error('OPENROUTER_API_KEY not configured');
@@ -104,8 +108,9 @@ async function callOpenRouterAPI(params: {
     params.isOpening,
     params.diceRoll,
     params.roundNumber,
+    params.maxRounds,
+    params.phase,
     params.goal,
-    params.resources,
     params.isGoalSelection,
     params.isEnding
   );
@@ -235,13 +240,15 @@ async function callQwenAPI(params: {
   isOpening?: boolean;
   diceRoll?: DiceRoll;
   goal?: GameGoal;
-  resources?: Resource[];
   roundNumber?: number;
+  maxRounds?: number;
+  phase?: GamePhase;
+  previousOutcome?: DiceOutcome | null;
   isGoalSelection?: boolean;
   isEnding?: boolean;
 }): Promise<GenerateStoryResponse> {
   const apiKey = process.env.QWEN_API_KEY;
-  
+
   if (!apiKey) {
     throw new Error('QWEN_API_KEY not configured');
   }
@@ -254,8 +261,9 @@ async function callQwenAPI(params: {
     params.isOpening,
     params.diceRoll,
     params.roundNumber,
+    params.maxRounds,
+    params.phase,
     params.goal,
-    params.resources,
     params.isGoalSelection,
     params.isEnding
   );
@@ -310,13 +318,15 @@ async function callZhipuAPI(params: {
   isOpening?: boolean;
   diceRoll?: DiceRoll;
   goal?: GameGoal;
-  resources?: Resource[];
   roundNumber?: number;
+  maxRounds?: number;
+  phase?: GamePhase;
+  previousOutcome?: DiceOutcome | null;
   isGoalSelection?: boolean;
   isEnding?: boolean;
 }): Promise<GenerateStoryResponse> {
   const apiKey = process.env.ZHIPU_API_KEY;
-  
+
   if (!apiKey) {
     throw new Error('ZHIPU_API_KEY not configured');
   }
@@ -329,8 +339,9 @@ async function callZhipuAPI(params: {
     params.isOpening,
     params.diceRoll,
     params.roundNumber,
+    params.maxRounds,
+    params.phase,
     params.goal,
-    params.resources,
     params.isGoalSelection,
     params.isEnding
   );
@@ -380,14 +391,16 @@ async function callWenxinAPI(params: {
   isOpening?: boolean;
   diceRoll?: DiceRoll;
   goal?: GameGoal;
-  resources?: Resource[];
   roundNumber?: number;
+  maxRounds?: number;
+  phase?: GamePhase;
+  previousOutcome?: DiceOutcome | null;
   isGoalSelection?: boolean;
   isEnding?: boolean;
 }): Promise<GenerateStoryResponse> {
   const apiKey = process.env.WENXIN_API_KEY;
   const secretKey = process.env.WENXIN_SECRET_KEY;
-  
+
   if (!apiKey || !secretKey) {
     throw new Error('WENXIN_API_KEY or WENXIN_SECRET_KEY not configured');
   }
@@ -397,7 +410,7 @@ async function callWenxinAPI(params: {
     `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${apiKey}&client_secret=${secretKey}`,
     { method: 'POST' }
   );
-  
+
   const tokenData = await tokenResponse.json();
   const accessToken = tokenData.access_token;
 
@@ -413,8 +426,9 @@ async function callWenxinAPI(params: {
     params.isOpening,
     params.diceRoll,
     params.roundNumber,
+    params.maxRounds,
+    params.phase,
     params.goal,
-    params.resources,
     params.isGoalSelection,
     params.isEnding
   );
@@ -474,15 +488,6 @@ function parseAIResponse(content: string): GenerateStoryResponse {
       if (parsed.goalOptions) {
         response.goalOptions = parsed.goalOptions;
       }
-      if (parsed.resourceDefinitions) {
-        response.resourceDefinitions = parsed.resourceDefinitions;
-      }
-      if (parsed.initialResources) {
-        response.initialResources = parsed.initialResources;
-      }
-      if (parsed.resourceChanges) {
-        response.resourceChanges = parsed.resourceChanges;
-      }
       if (parsed.goalProgress) {
         response.goalProgress = parsed.goalProgress;
       }
@@ -491,10 +496,12 @@ function parseAIResponse(content: string): GenerateStoryResponse {
       }
       
       // 第三轮目标选择时 choices 为空数组，但有 goalOptions
+      // 结局时 choices 为空数组，但有 ending
       const hasValidChoices = Array.isArray(response.choices) && response.choices.length > 0;
       const hasGoalOptions = Array.isArray(response.goalOptions) && response.goalOptions.length > 0;
+      const hasEnding = !!response.ending;
 
-      if (response.content && (hasValidChoices || hasGoalOptions)) {
+      if (response.content && (hasValidChoices || hasGoalOptions || hasEnding)) {
         return response;
       }
     }
@@ -555,11 +562,11 @@ export function mockGenerateStory(params: {
     setTimeout(() => {
       if (params.isOpening) {
         const openings = {
-          wuxia: `江南三月，春雨绵绵。${params.character.name}独自一人行走在青石板路上，身披蓑衣，手持一把油纸伞。前方不远处，一座古老的客栈矗立在烟雨朦胧中，木质招牌上写着"醉仙居"三个大字。忽然，一阵急促的马蹄声从身后传来，数名黑衣人策马狂奔而过，溅起一地泥水。${params.character.name}眉头一皱，凭借${params.character.tags[0]}的直觉，感觉这些人来者不善。客栈二楼的窗户突然打开，一位白衣女子探出头来，焦急地四处张望。`,
+          wuxia: `江南三月，春雨绵绵。${params.character.name}独自一人行走在青石板路上，身披蓑衣，手持一把油纸伞。前方不远处，一座古老的客栈矗立在烟雨朦胧中，木质招牌上写着"醉仙居"三个大字。忽然，一阵急促的马蹄声从身后传来，数名黑衣人策马狂奔而过，溅起一地泥水。${params.character.name}眉头一皱，感觉这些人来者不善。客栈二楼的窗户突然打开，一位白衣女子探出头来，焦急地四处张望。`,
           'urban-mystery': `深夜十一点，${params.character.name}加完班回到自己租住的老式公寓。走廊里的灯又坏了，只能借着手机的光亮摸索前进。当走到304号房门前时，${params.character.name}注意到邻居王大爷的门虚掩着，里面隐约传来电视的声音。这很不寻常——平时王大爷九点就睡觉了。${params.character.name}犹豫着是否该进去看看。就在这时，自己的房门后传来一声轻微的响动，像是有什么东西掉在地上...`,
           'peaky-blinders': `1925年，伯明翰。夜幕降临，工厂区的烟囱依然吐着黑烟。${params.character.name}推开"金狮酒馆"的木门，烟雾和威士忌的气味扑面而来。酒馆里的人们看到${params.character.name}进来，纷纷压低了声音。角落里，三个戴着平顶帽的男人正在低声交谈，他们是"剃刀帮"的成员。吧台后的老板冲${params.character.name}使了个眼色，示意楼上有人在等。${params.character.name}知道，今晚的会面将决定自己在这个城市的命运——是成为帮派的一员，还是成为街头的一具尸体。`
         };
-        
+
         resolve({
           content: openings[params.genre] || openings.wuxia,
           choices: [

@@ -9,27 +9,37 @@ import CustomInput from '@/components/custom-input';
 import LoadingOverlay from '@/components/loading-overlay';
 import DiceRoller from '@/components/dice-roller';
 import GoalDisplay from '@/components/goal-display';
-import ResourceDisplay from '@/components/resource-display';
 import EndingDisplay from '@/components/ending-display';
 import GoalSelection from '@/components/goal-selection';
+import DebugPanel from '@/components/debug-panel';
 import { Choice } from '@/lib/types';
 
 export default function GamePage() {
   const router = useRouter();
-  const { 
-    currentGame, 
-    isLoading, 
-    error, 
-    makeChoice, 
+  const {
+    currentGame,
+    isLoading,
+    error,
+    makeChoice,
     clearGame,
     currentDiceRoll,
     isRollingDice,
-    clearDiceRoll,
     lastAIResponse,
-    selectGoal
+    selectGoal,
+    pendingNode,
+    confirmContinue
   } = useGameStore();
   const [showChoices, setShowChoices] = useState(false);
-  const [showDebug, setShowDebug] = useState(false);
+
+  const handleStoryComplete = useCallback(() => {
+    setShowChoices(true);
+  }, []);
+
+  // 当 currentNodeIndex 变化时，重置选项显示状态
+  useEffect(() => {
+    setShowChoices(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentGame?.currentNodeIndex]);
 
   useEffect(() => {
     // If no game is loaded, redirect to home
@@ -44,7 +54,7 @@ export default function GamePage() {
 
   const currentNode = currentGame.storyNodes[currentGame.currentNodeIndex];
   const roundNumber = currentGame.currentNodeIndex + 1;
-  const maxRounds = currentGame.maxRounds || 15;
+  const maxRounds = currentGame.maxRounds || 10;
   const isGameEnded = !!currentGame.ending;
   // Check if we're in round 3 goal selection
   // Get goalOptions from currentNode or lastAIResponse
@@ -56,14 +66,6 @@ export default function GamePage() {
     await makeChoice(choice);
   };
 
-  const handleDiceComplete = useCallback(() => {
-    clearDiceRoll();
-  }, [clearDiceRoll]);
-
-  const handleStoryComplete = useCallback(() => {
-    setShowChoices(true);
-  }, []);
-
   return (
     <main className="min-h-screen bg-gradient-to-b from-gray-900 via-black to-gray-900 py-8 px-4">
       <div className="max-w-4xl mx-auto">
@@ -74,24 +76,20 @@ export default function GamePage() {
               {currentGame.character.name}的冒险
             </h1>
             <p className="text-gray-400">
-              {currentGame.genre === 'wuxia' ? '🗡️ 武侠江湖' : 
-               currentGame.genre === 'urban-mystery' ? '🌃 都市灵异' : 
-               '🎩 浴血黑帮'} · 
-              第 {roundNumber} / {maxRounds} 轮
+              {currentGame.genre === 'wuxia' ? '🗡️ 武侠江湖' :
+               currentGame.genre === 'urban-mystery' ? '🌃 都市灵异' :
+               '🎩 浴血黑帮'} ·
+              {isGameEnded
+                ? '故事结局'
+                : roundNumber <= 3
+                  ? `序章 · 第${roundNumber}章`
+                  : `第 ${roundNumber - 3} / ${maxRounds - 3} 轮`}
             </p>
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => setShowDebug(!showDebug)}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg 
-                       transition-colors text-sm"
-              title="查看AI原始响应"
-            >
-              🔍 调试
-            </button>
-            <button
               onClick={() => router.push('/history')}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg 
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg
                        transition-colors text-sm"
             >
               📜 历史
@@ -103,27 +101,11 @@ export default function GamePage() {
                   router.push('/');
                 }
               }}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg 
+              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg
                        transition-colors text-sm"
             >
               🏠 主页
             </button>
-          </div>
-        </div>
-
-        {/* Character Info */}
-        <div className="mb-6 p-4 bg-gray-800/50 rounded-xl border border-gray-700">
-          <div className="flex flex-wrap gap-2 items-center">
-            <span className="text-gray-400">特质：</span>
-            {currentGame.character.tags.map((tag, i) => (
-              <span
-                key={i}
-                className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-sm 
-                         border border-blue-500/30"
-              >
-                {tag}
-              </span>
-            ))}
           </div>
         </div>
 
@@ -148,37 +130,6 @@ export default function GamePage() {
           )
         )}
 
-        {/* Resource Display */}
-        {!isGameEnded && (
-          <ResourceDisplay 
-            resources={currentGame.resources || []} 
-            resourceDefinitions={currentGame.resourceDefinitions}
-          />
-        )}
-
-        {/* Debug Panel */}
-        {showDebug && lastAIResponse && (
-          <div className="mb-6 p-4 bg-gray-900/90 border border-gray-600 rounded-lg">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-semibold text-gray-200">🔍 AI原始响应</h3>
-              <button
-                onClick={() => setShowDebug(false)}
-                className="text-gray-400 hover:text-gray-200 text-sm"
-              >
-                关闭
-              </button>
-            </div>
-            <pre className="text-xs text-gray-300 overflow-auto max-h-96 bg-black/50 p-4 rounded border border-gray-700">
-              {JSON.stringify(lastAIResponse, null, 2)}
-            </pre>
-            <div className="mt-3 text-sm text-gray-400">
-              <p>目标选项数量: {lastAIResponse.goalOptions?.length || 0}</p>
-              <p>资源变化数量: {lastAIResponse.resourceChanges?.length || 0}</p>
-              <p>目标进度: {lastAIResponse.goalProgress ? `${lastAIResponse.goalProgress.percentage}%` : '无'}</p>
-            </div>
-          </div>
-        )}
-
         {/* Error Display */}
         {error && (
           <div className="mb-6 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-300">
@@ -192,8 +143,62 @@ export default function GamePage() {
           </div>
         )}
 
-        {/* 显示上一轮的选择 */}
-        {currentGame.currentNodeIndex > 0 && currentGame.storyNodes[currentGame.currentNodeIndex - 1]?.userChoice && (
+        {/* 显示当前轮的选择结果和"继续"按钮（当有 pendingNode 时） */}
+        {pendingNode && !isLoading && (
+          <div className="mb-6 space-y-4">
+            {/* 当前轮的选择 */}
+            {currentNode.userChoice && (
+              <div className="p-4 bg-blue-900/30 rounded-lg border border-blue-500/30">
+                <span className="text-blue-300 text-sm">你的选择：</span>
+                <span className="text-white ml-2">{currentNode.userChoice}</span>
+              </div>
+            )}
+
+            {/* 骰子结果 */}
+            {currentNode.diceRoll && (
+              <div className="p-4 bg-purple-900/30 rounded-lg border border-purple-500/30">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🎲</span>
+                  <div>
+                    <p className="text-purple-200">
+                      掷骰结果：{currentNode.diceRoll.dice1} + {currentNode.diceRoll.dice2} = {currentNode.diceRoll.total}
+                      {' '}(难度 {currentNode.diceRoll.difficulty})
+                    </p>
+                    <p className={`text-sm font-medium ${
+                      currentNode.diceRoll.outcome === 'critical-success' ? 'text-yellow-400' :
+                      currentNode.diceRoll.outcome === 'perfect' ? 'text-green-400' :
+                      currentNode.diceRoll.outcome === 'success' ? 'text-green-300' :
+                      currentNode.diceRoll.outcome === 'fail' ? 'text-red-300' :
+                      'text-red-500'
+                    }`}>
+                      {currentNode.diceRoll.outcome === 'critical-success' ? '大成功！' :
+                       currentNode.diceRoll.outcome === 'perfect' ? '完美成功！' :
+                       currentNode.diceRoll.outcome === 'success' ? '成功' :
+                       currentNode.diceRoll.outcome === 'fail' ? '失败' :
+                       '大失败！'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 继续按钮 */}
+            <button
+              onClick={confirmContinue}
+              className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600
+                       hover:from-blue-500 hover:to-purple-500
+                       text-white font-medium text-lg rounded-xl
+                       transition-all duration-200 shadow-lg hover:shadow-xl
+                       flex items-center justify-center gap-2"
+            >
+              <span>继续冒险</span>
+              <span className="text-xl">→</span>
+            </button>
+          </div>
+        )}
+
+        {/* 显示上一轮的选择（只在没有 pendingNode 时显示） */}
+        {!pendingNode && currentGame.currentNodeIndex > 0 && currentGame.storyNodes[currentGame.currentNodeIndex - 1]?.userChoice && (
           <div className="mb-4 p-3 bg-blue-900/30 rounded-lg border border-blue-500/30">
             <span className="text-blue-300 text-sm">你的选择：</span>
             <span className="text-white ml-2">
@@ -204,15 +209,20 @@ export default function GamePage() {
 
         {/* Story Content */}
         <div className="mb-8">
-          <StoryDisplay 
+          <StoryDisplay
             key={currentNode.id}
-            content={currentNode.content} 
+            content={currentNode.content}
             onComplete={handleStoryComplete}
           />
+
+          {/* Ending Display - 融入故事流程 */}
+          {isGameEnded && currentGame.ending && (
+            <EndingDisplay ending={currentGame.ending} />
+          )}
         </div>
 
         {/* Goal Selection (Round 3) */}
-        {isRound3GoalSelection && showChoices && !isLoading && !isGameEnded && goalOptions && (
+        {isRound3GoalSelection && showChoices && !isLoading && !isGameEnded && !pendingNode && goalOptions && (
           <GoalSelection
             goals={goalOptions}
             onSelect={async (goal) => {
@@ -224,10 +234,10 @@ export default function GamePage() {
         )}
 
         {/* Regular Choices */}
-        {!isRound3GoalSelection && showChoices && !isLoading && !isGameEnded && (
+        {!isRound3GoalSelection && showChoices && !isLoading && !isGameEnded && !pendingNode && (
           <div className="space-y-4">
             <h2 className="text-xl font-medium text-gray-300 mb-4">你会如何选择？</h2>
-            
+
             <ChoiceButtons
               choices={currentNode.choices}
               onSelect={handleChoice}
@@ -241,24 +251,9 @@ export default function GamePage() {
           </div>
         )}
 
-        {/* Game Ended Message */}
-        {isGameEnded && (
-          <div className="text-center py-8">
-            <p className="text-gray-400 mb-4">游戏已结束</p>
-            <button
-              onClick={() => {
-                clearGame();
-                router.push('/');
-              }}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              返回主页
-            </button>
-          </div>
-        )}
       </div>
 
-      {/* Loading Overlay */}
+      {/* Loading Overlay - 仅在 API 加载中显示 */}
       <LoadingOverlay show={isLoading} />
 
       {/* Dice Roller */}
@@ -266,15 +261,14 @@ export default function GamePage() {
         <DiceRoller
           diceRoll={currentDiceRoll}
           isRolling={isRollingDice}
-          onComplete={handleDiceComplete}
+          isLoading={isLoading}
+          hasPendingNode={!!pendingNode}
+          onComplete={confirmContinue}
         />
       )}
 
-      {/* Ending Display */}
-      {isGameEnded && currentGame.ending && (
-        <EndingDisplay ending={currentGame.ending} />
-      )}
+      {/* Debug Panel */}
+      <DebugPanel />
     </main>
   );
 }
-

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Genre, CHARACTER_TAGS, CharacterTag } from '@/lib/types';
+import { Genre } from '@/lib/types';
 import { useGameStore } from '@/store/game-store';
 
 const GENRES = [
@@ -11,8 +11,6 @@ const GENRES = [
   { id: 'peaky-blinders' as Genre, name: '浴血黑帮', desc: '1920年代，权谋与血性' },
 ];
 
-const MAX_TAGS = 3;
-
 export default function CharacterForm() {
   const router = useRouter();
   const startNewGame = useGameStore(state => state.startNewGame);
@@ -20,16 +18,7 @@ export default function CharacterForm() {
 
   const [selectedGenre, setSelectedGenre] = useState<Genre>('wuxia');
   const [characterName, setCharacterName] = useState('');
-  const [selectedTags, setSelectedTags] = useState<CharacterTag[]>([]);
   const [error, setError] = useState('');
-
-  const toggleTag = (tag: CharacterTag) => {
-    if (selectedTags.includes(tag)) {
-      setSelectedTags(selectedTags.filter(t => t !== tag));
-    } else if (selectedTags.length < MAX_TAGS) {
-      setSelectedTags([...selectedTags, tag]);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,11 +27,6 @@ export default function CharacterForm() {
     // Validation
     if (!characterName.trim()) {
       setError('请输入角色名字');
-      return;
-    }
-
-    if (selectedTags.length === 0) {
-      setError('请至少选择一个特质');
       return;
     }
 
@@ -56,8 +40,7 @@ export default function CharacterForm() {
     const character = {
       id: `char-${Date.now()}`,
       name: characterName.trim(),
-      tags: selectedTags,
-      description: `一位具有${selectedTags.join('、')}特质的${genreDesc[selectedGenre]}`,
+      description: `一位神秘的${genreDesc[selectedGenre]}`,
       createdAt: Date.now(),
     };
 
@@ -110,44 +93,10 @@ export default function CharacterForm() {
           onChange={(e) => setCharacterName(e.target.value)}
           placeholder="请输入你的角色名字"
           maxLength={20}
-          className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg 
-                   text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 
+          className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg
+                   text-white placeholder-gray-500 focus:outline-none focus:border-blue-500
                    transition-colors"
         />
-      </div>
-
-      {/* Character Tags */}
-      <div className="space-y-3">
-        <label className="block text-lg font-medium text-gray-200">
-          选择特质 ({selectedTags.length}/{MAX_TAGS})
-        </label>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-          {CHARACTER_TAGS.map((tag) => {
-            const isSelected = selectedTags.includes(tag);
-            const isDisabled = !isSelected && selectedTags.length >= MAX_TAGS;
-
-            return (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => toggleTag(tag)}
-                disabled={isDisabled}
-                className={`py-3 px-4 rounded-lg border-2 transition-all font-medium ${
-                  isSelected
-                    ? 'border-blue-500 bg-blue-500/30 text-blue-200'
-                    : isDisabled
-                    ? 'border-gray-800 bg-gray-900/50 text-gray-600 cursor-not-allowed'
-                    : 'border-gray-700 bg-gray-800/70 text-gray-300 hover:border-gray-600'
-                }`}
-              >
-                {tag}
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-sm text-gray-500">
-          特质会影响你在故事中的遭遇和选择
-        </p>
       </div>
 
       {/* Error Message */}
@@ -161,9 +110,9 @@ export default function CharacterForm() {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600 
-                 text-white font-bold text-lg rounded-xl hover:from-blue-500 
-                 hover:to-purple-500 transition-all disabled:opacity-50 
+        className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600
+                 text-white font-bold text-lg rounded-xl hover:from-blue-500
+                 hover:to-purple-500 transition-all disabled:opacity-50
                  disabled:cursor-not-allowed shadow-lg hover:shadow-xl"
       >
         {isLoading ? '正在创建冒险...' : '开始冒险 →'}
@@ -171,4 +120,3 @@ export default function CharacterForm() {
     </form>
   );
 }
-

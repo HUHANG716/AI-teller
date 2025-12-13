@@ -55,7 +55,7 @@ export default function Home() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-16"
         >
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 bg-clip-text 
+          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 bg-clip-text
                        text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
             AI Storyteller
           </h1>
@@ -76,9 +76,9 @@ export default function Home() {
         >
           <button
             onClick={handleNewGame}
-            className="w-full py-6 bg-gradient-to-r from-blue-600 to-purple-600 
-                     hover:from-blue-500 hover:to-purple-500 text-white font-bold 
-                     text-xl rounded-2xl transition-all shadow-2xl hover:shadow-blue-500/50 
+            className="w-full py-6 bg-gradient-to-r from-blue-600 to-purple-600
+                     hover:from-blue-500 hover:to-purple-500 text-white font-bold
+                     text-xl rounded-2xl transition-all shadow-2xl hover:shadow-blue-500/50
                      transform hover:scale-[1.02]"
           >
             🎮 开始新的冒险
@@ -101,19 +101,19 @@ export default function Home() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 + index * 0.1 }}
                   onClick={() => handleContinueGame(game.id)}
-                  className="p-6 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl 
-                           border-2 border-gray-700 hover:border-blue-500 cursor-pointer 
+                  className="p-6 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl
+                           border-2 border-gray-700 hover:border-blue-500 cursor-pointer
                            transition-all hover:shadow-lg hover:shadow-blue-500/20 group"
                 >
                   <div className="flex justify-between items-start mb-3">
                     <div>
-                      <h3 className="text-xl font-bold text-white group-hover:text-blue-400 
+                      <h3 className="text-xl font-bold text-white group-hover:text-blue-400
                                    transition-colors">
                         {game.character.name}
                       </h3>
                       <p className="text-sm text-gray-400">
-                        {game.genre === 'wuxia' ? '🗡️ 武侠江湖' : 
-                         game.genre === 'urban-mystery' ? '🌃 都市灵异' : 
+                        {game.genre === 'wuxia' ? '🗡️ 武侠江湖' :
+                         game.genre === 'urban-mystery' ? '🌃 都市灵异' :
                          '🎩 浴血黑帮'}
                       </p>
                     </div>
@@ -124,18 +124,6 @@ export default function Home() {
                     >
                       🗑️
                     </button>
-                  </div>
-
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    {game.character.tags.map((tag, i) => (
-                      <span
-                        key={i}
-                        className="px-2 py-1 bg-blue-500/20 text-blue-300 rounded text-xs 
-                                 border border-blue-500/30"
-                      >
-                        {tag}
-                      </span>
-                    ))}
                   </div>
 
                   <div className="text-sm text-gray-500 space-y-1">
@@ -194,4 +182,3 @@ export default function Home() {
     </main>
   );
 }
-

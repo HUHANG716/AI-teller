@@ -13,36 +13,48 @@ export default function StoryDisplay({ content, onComplete }: StoryDisplayProps)
   const [isComplete, setIsComplete] = useState(false);
   const onCompleteRef = useRef(onComplete);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const isMountedRef = useRef(true); // 追踪组件是否已挂载
 
   // Update ref when onComplete changes
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
 
+  // 追踪组件挂载状态
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     setDisplayedText('');
     setIsComplete(false);
-    
+
     // Clear any existing interval
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
     }
-    
+
     let currentIndex = 0;
     const textLength = content.length;
-    
+
     // Typewriter effect
     intervalRef.current = setInterval(() => {
       if (currentIndex < textLength) {
         setDisplayedText(content.slice(0, currentIndex + 1));
         currentIndex++;
       } else {
-        setIsComplete(true);
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          intervalRef.current = null;
+        // 只有在组件仍然挂载时才更新状态和调用回调
+        if (isMountedRef.current) {
+          setIsComplete(true);
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
+          onCompleteRef.current?.();
         }
-        onCompleteRef.current?.();
       }
     }, 30); // Speed of typing effect
 

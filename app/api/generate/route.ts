@@ -1,23 +1,22 @@
 // API route for AI story generation
 import { NextRequest, NextResponse } from 'next/server';
 import { generateStory, mockGenerateStory } from '@/lib/ai-service';
-import { Genre, Character, StoryNode, DiceRoll, GameGoal, Resource } from '@/lib/types';
+import { Genre, Character, StoryNode, DiceRoll, GameGoal } from '@/lib/types';
 import { apiLogger } from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
-  
+
   try {
     const body = await req.json();
-    const { 
-      genre, 
-      character, 
-      history, 
-      userInput, 
-      isOpening, 
+    const {
+      genre,
+      character,
+      history,
+      userInput,
+      isOpening,
       diceRoll,
       goal,
-      resources,
       roundNumber,
       isGoalSelection,
       isEnding
@@ -29,13 +28,12 @@ export async function POST(req: NextRequest) {
       isOpening?: boolean;
       diceRoll?: DiceRoll;
       goal?: GameGoal;
-      resources?: Resource[];
       roundNumber?: number;
       isGoalSelection?: boolean;
       isEnding?: boolean;
     };
 
-    apiLogger.info({ 
+    apiLogger.info({
       endpoint: '/api/generate',
       genre,
       characterName: character?.name,
@@ -61,8 +59,8 @@ export async function POST(req: NextRequest) {
 
     // Use mock for development if no API key is configured
     const useMock = !process.env.OPENROUTER_API_KEY &&
-                     !process.env.QWEN_API_KEY && 
-                     !process.env.ZHIPU_API_KEY && 
+                     !process.env.QWEN_API_KEY &&
+                     !process.env.ZHIPU_API_KEY &&
                      !process.env.WENXIN_API_KEY;
 
     if (useMock) {
@@ -71,22 +69,21 @@ export async function POST(req: NextRequest) {
 
     const result = useMock
       ? await mockGenerateStory({ genre, character, history, userInput, isOpening, diceRoll })
-      : await generateStory({ 
-          genre, 
-          character, 
-          history, 
-          userInput, 
-          isOpening, 
+      : await generateStory({
+          genre,
+          character,
+          history,
+          userInput,
+          isOpening,
           diceRoll,
           goal,
-          resources,
           roundNumber,
           isGoalSelection,
           isEnding
         });
 
     const duration = Date.now() - startTime;
-    
+
     // Log successful response details
     console.log('✅ API请求成功:', {
       duration: `${duration}ms`,
@@ -94,18 +91,15 @@ export async function POST(req: NextRequest) {
       choicesCount: Array.isArray(result.choices) ? result.choices.length : 0,
       hasGoalOptions: !!result.goalOptions,
       goalOptionsCount: result.goalOptions?.length || 0,
-      hasResourceChanges: !!result.resourceChanges,
-      resourceChangesCount: result.resourceChanges?.length || 0,
       hasGoalProgress: !!result.goalProgress,
       hasEnding: !!result.ending
     });
-    
-    apiLogger.info({ 
+
+    apiLogger.info({
       duration: `${duration}ms`,
       contentLength: result.content?.length || 0,
       choicesCount: Array.isArray(result.choices) ? result.choices.length : 0,
       hasGoalOptions: !!result.goalOptions,
-      hasResourceChanges: !!result.resourceChanges,
       hasGoalProgress: !!result.goalProgress,
       hasEnding: !!result.ending
     }, 'API request completed');
@@ -115,31 +109,22 @@ export async function POST(req: NextRequest) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     const errorStack = error instanceof Error ? error.stack : undefined;
-    
+
     console.error('❌ API生成失败:', {
       error: errorMessage,
       stack: errorStack,
-      duration: `${duration}ms`,
-      genre: body.genre,
-      characterName: body.character?.name,
-      isOpening: body.isOpening,
-      isGoalSelection: body.isGoalSelection,
-      isEnding: body.isEnding,
-      roundNumber: body.roundNumber
+      duration: `${duration}ms`
     });
-    
-    apiLogger.error({ 
+
+    apiLogger.error({
       error: errorMessage,
       stack: errorStack,
-      duration: `${duration}ms`,
-      genre: body.genre,
-      characterName: body.character?.name
+      duration: `${duration}ms`
     }, 'API request failed');
-    
+
     return NextResponse.json(
       { error: `AI生成失败: ${errorMessage}` },
       { status: 500 }
     );
   }
 }
-

@@ -18,7 +18,7 @@ export default function GoalSelection({ goals, onSelect, disabled }: GoalSelecti
       <p className="text-gray-400 text-center mb-8">
         这是决定你冒险方向的关键时刻。选择一个目标，它将指引你接下来的旅程。
       </p>
-      
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {goals.map((goal, index) => (
           <motion.button
@@ -28,56 +28,14 @@ export default function GoalSelection({ goals, onSelect, disabled }: GoalSelecti
             transition={{ delay: index * 0.1 }}
             onClick={() => !disabled && onSelect(goal)}
             disabled={disabled}
-            className="p-6 bg-gradient-to-br from-purple-900/50 to-blue-900/50 rounded-xl 
-                     border-2 border-purple-500/30 hover:border-purple-500/60 
+            className="p-6 bg-gradient-to-br from-purple-900/50 to-blue-900/50 rounded-xl
+                     border-2 border-purple-500/30 hover:border-purple-500/60
                      transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed
                      hover:scale-105 active:scale-95"
           >
-            <h3 className="text-xl font-semibold text-purple-200 mb-3">
+            <h3 className="text-xl font-semibold text-purple-200">
               {goal.description}
             </h3>
-            
-            {goal.requirements && (
-              <div className="space-y-2 text-sm text-gray-300">
-                {goal.requirements.resources && goal.requirements.resources.length > 0 && (
-                  <div>
-                    <span className="text-gray-400">需要资源：</span>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {goal.requirements.resources.map((res, i) => (
-                        <span key={i} className="px-2 py-1 bg-gray-700/50 rounded text-xs">
-                          {res.type === 'gold' ? '💰' : res.type === 'reputation' ? '⭐' : '💼'} 
-                          {res.type === 'gold' ? '金币' : res.type === 'reputation' ? '声望' : '影响力'}: {res.amount || 0}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {goal.requirements.items && goal.requirements.items.length > 0 && (
-                  <div>
-                    <span className="text-gray-400">需要道具：</span>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      {goal.requirements.items.map((item, i) => (
-                        <span key={i} className="px-2 py-1 bg-gray-700/50 rounded text-xs">
-                          📦 {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {goal.requirements.conditions && goal.requirements.conditions.length > 0 && (
-                  <div>
-                    <span className="text-gray-400">需要完成：</span>
-                    <ul className="list-disc list-inside mt-1 space-y-1">
-                      {goal.requirements.conditions.map((condition, i) => (
-                        <li key={i} className="text-xs">{condition}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            )}
           </motion.button>
         ))}
       </div>

@@ -1,9 +1,18 @@
 // localStorage wrapper for persisting game state
-import { GameState } from './types';
+import { GameState, GAME_CONFIG } from './types';
 import { storageLogger } from './logger';
 
 const STORAGE_KEY = 'ai-teller-games';
 const CURRENT_GAME_KEY = 'ai-teller-current-game';
+
+/**
+ * Migrate character from old formats (remove legacy fields)
+ */
+function migrateCharacter(character: any): any {
+  // Remove legacy fields (traits, tags, specialty) if they exist
+  const { traits, tags, specialty, ...cleanCharacter } = character;
+  return cleanCharacter;
+}
 
 /**
  * Save or update a game in localStorage
@@ -63,13 +72,16 @@ export function getAllGames(): GameState[] {
     const games = JSON.parse(data) as GameState[];
     
     // Migrate old games to include new fields
-    const migratedGames = games.map(game => ({
-      ...game,
-      resources: game.resources || [],
-      maxRounds: game.maxRounds || 15,
-      resourceDefinitions: game.resourceDefinitions || undefined,
-      // goal and ending are optional, so they can be undefined
-    }));
+    const migratedGames = games.map(game => {
+      // Remove legacy fields from game state
+      const { resources, resourceDefinitions, ...cleanGame } = game as any;
+      return {
+        ...cleanGame,
+        character: migrateCharacter(game.character),
+        maxRounds: game.maxRounds || GAME_CONFIG.defaultMaxRounds,
+        // goal and ending are optional, so they can be undefined
+      };
+    });
     
     storageLogger.debug({ totalGames: migratedGames.length }, 'Games loaded');
     

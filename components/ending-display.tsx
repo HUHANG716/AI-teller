@@ -2,6 +2,8 @@
 
 import { Ending } from '@/lib/types';
 import { motion } from 'framer-motion';
+import { useRouter } from 'next/navigation';
+import { useGameStore } from '@/store/game-store';
 
 interface EndingDisplayProps {
   ending: Ending;
@@ -15,57 +17,59 @@ const endingTitles: Record<Ending['type'], string> = {
 };
 
 const endingColors: Record<Ending['type'], string> = {
-  'success': 'from-green-600 to-emerald-600',
-  'partial-success': 'from-yellow-600 to-orange-600',
-  'failure': 'from-red-600 to-rose-600',
-  'timeout': 'from-gray-600 to-slate-600',
+  'success': 'from-green-600/50 to-emerald-600/50 border-green-500/50',
+  'partial-success': 'from-yellow-600/50 to-orange-600/50 border-yellow-500/50',
+  'failure': 'from-red-600/50 to-rose-600/50 border-red-500/50',
+  'timeout': 'from-gray-600/50 to-slate-600/50 border-gray-500/50',
 };
 
 export default function EndingDisplay({ ending }: EndingDisplayProps) {
+  const router = useRouter();
+  const clearGame = useGameStore((state) => state.clearGame);
+
+  const handleReturnHome = () => {
+    clearGame();
+    router.push('/');
+  };
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+      className={`bg-gradient-to-br ${endingColors[ending.type]} rounded-2xl p-6 border-2 mt-6`}
     >
-      <motion.div
-        initial={{ y: 20 }}
-        animate={{ y: 0 }}
-        className={`max-w-2xl w-full bg-gradient-to-br ${endingColors[ending.type]} rounded-2xl p-8 shadow-2xl border-2 border-white/20`}
-      >
-        <div className="text-center mb-6">
-          <h2 className="text-4xl font-bold text-white mb-2">
-            {ending.title || endingTitles[ending.type]}
-          </h2>
-          <p className="text-white/80 text-sm">
-            {endingTitles[ending.type]}
-          </p>
-        </div>
-        
-        <div className="bg-white/10 rounded-xl p-6 mb-6 backdrop-blur-sm">
-          <p className="text-white text-lg leading-relaxed whitespace-pre-wrap">
-            {ending.description}
-          </p>
-        </div>
+      <div className="text-center mb-4">
+        <h2 className="text-3xl font-bold text-white mb-1">
+          {ending.title || endingTitles[ending.type]}
+        </h2>
+        <p className="text-white/70 text-sm">
+          {endingTitles[ending.type]}
+        </p>
+      </div>
 
-        {ending.conditions && ending.conditions.length > 0 && (
-          <div className="bg-white/5 rounded-lg p-4 mb-6">
-            <p className="text-white/70 text-sm mb-2">达成条件：</p>
-            <ul className="list-disc list-inside text-white/80 text-sm space-y-1">
-              {ending.conditions.map((condition, index) => (
-                <li key={index}>{condition}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <div className="text-center">
-          <p className="text-white/60 text-sm">
-            感谢你的冒险！
-          </p>
+      {ending.conditions && ending.conditions.length > 0 && (
+        <div className="bg-black/10 rounded-lg p-4 mb-4">
+          <p className="text-white/70 text-sm mb-2">达成条件：</p>
+          <ul className="list-disc list-inside text-white/80 text-sm space-y-1">
+            {ending.conditions.map((condition, index) => (
+              <li key={index}>{condition}</li>
+            ))}
+          </ul>
         </div>
-      </motion.div>
+      )}
+
+      <div className="text-center pt-4 border-t border-white/10">
+        <p className="text-white/50 text-sm mb-4">
+          感谢你的冒险！
+        </p>
+        <button
+          onClick={handleReturnHome}
+          className="px-6 py-3 bg-white/20 hover:bg-white/30 text-white font-medium rounded-lg transition-colors"
+        >
+          返回主页
+        </button>
+      </div>
     </motion.div>
   );
 }

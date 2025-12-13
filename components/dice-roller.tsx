@@ -7,11 +7,17 @@ import { getOutcomeDescription, getOutcomeEmoji } from '@/lib/dice-engine';
 interface DiceRollerProps {
   diceRoll: DiceRoll | null;
   isRolling: boolean;
+  isLoading?: boolean; // API 是否正在加载
+  hasPendingNode?: boolean; // 是否有待显示的节点
   onComplete?: () => void;
 }
 
-export default function DiceRoller({ diceRoll, isRolling, onComplete }: DiceRollerProps) {
+export default function DiceRoller({ diceRoll, isRolling, isLoading, hasPendingNode, onComplete }: DiceRollerProps) {
   if (!isRolling && !diceRoll) return null;
+
+  // 确定按钮状态和文字
+  const isWaitingForApi = isLoading && !hasPendingNode;
+  const canContinue = !isRolling && diceRoll && hasPendingNode;
 
   return (
     <AnimatePresence>
@@ -20,7 +26,6 @@ export default function DiceRoller({ diceRoll, isRolling, onComplete }: DiceRoll
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
-        onClick={onComplete}
       >
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -77,30 +82,11 @@ export default function DiceRoller({ diceRoll, isRolling, onComplete }: DiceRoll
                 transition={{ delay: 0.4 }}
                 className="bg-gray-700/50 rounded-xl p-4 space-y-2"
               >
-                <div className="flex justify-between text-gray-300">
-                  <span>骰子总和:</span>
-                  <span className="font-bold text-white">{diceRoll.total}</span>
+                <div className="flex justify-between text-lg">
+                  <span className="text-gray-200">骰子结果:</span>
+                  <span className="font-bold text-yellow-400">{diceRoll.total}</span>
                 </div>
-                
-                {diceRoll.bonus > 0 && (
-                  <>
-                    <div className="flex justify-between text-blue-300">
-                      <span>特质加成:</span>
-                      <span className="font-bold">+{diceRoll.bonus}</span>
-                    </div>
-                    {diceRoll.matchedTraits.length > 0 && (
-                      <div className="text-xs text-gray-400 text-right">
-                        ({diceRoll.matchedTraits.join('、')})
-                      </div>
-                    )}
-                  </>
-                )}
-                
-                <div className="pt-2 border-t border-gray-600 flex justify-between text-lg">
-                  <span className="text-gray-200">最终结果:</span>
-                  <span className="font-bold text-yellow-400">{diceRoll.finalResult}</span>
-                </div>
-                
+
                 <div className="flex justify-between text-gray-400 text-sm">
                   <span>难度:</span>
                   <span>{diceRoll.difficulty}</span>
@@ -134,18 +120,34 @@ export default function DiceRoller({ diceRoll, isRolling, onComplete }: DiceRoll
                 )}
               </motion.div>
 
-              {/* Continue button */}
-              <motion.button
+              {/* Continue button - 根据状态显示不同内容 */}
+              <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.8 }}
-                onClick={onComplete}
-                className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 
-                         hover:from-blue-500 hover:to-purple-500 text-white font-medium 
-                         rounded-xl transition-all"
               >
-                继续故事 →
-              </motion.button>
+                {isWaitingForApi ? (
+                  // API 加载中
+                  <div className="w-full py-3 bg-gray-600 text-gray-300 font-medium rounded-xl text-center flex items-center justify-center gap-2">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                      className="w-5 h-5 border-2 border-gray-400 border-t-white rounded-full"
+                    />
+                    AI正在编织故事...
+                  </div>
+                ) : canContinue ? (
+                  // 可以继续
+                  <button
+                    onClick={onComplete}
+                    className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600
+                             hover:from-blue-500 hover:to-purple-500 text-white font-medium
+                             rounded-xl transition-all"
+                  >
+                    继续冒险 →
+                  </button>
+                ) : null}
+              </motion.div>
             </div>
           ) : null}
         </motion.div>
@@ -153,4 +155,3 @@ export default function DiceRoller({ diceRoll, isRolling, onComplete }: DiceRoll
     </AnimatePresence>
   );
 }
-
