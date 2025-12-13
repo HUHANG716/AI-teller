@@ -73,3 +73,4 @@ export default function EndingDisplay({ ending }: EndingDisplayProps) {
     </motion.div>
   );
 }
+
