@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Genre } from '@/lib/types';
+import { CharacterFormDataSchema } from '@/lib/schemas';
 import { useGameStore } from '@/store/game-store';
 
 const GENRES = [
@@ -24,9 +25,15 @@ export default function CharacterForm() {
     e.preventDefault();
     setError('');
 
-    // Validation
-    if (!characterName.trim()) {
-      setError('请输入角色名字');
+    // Validation using Zod schema
+    const validationResult = CharacterFormDataSchema.safeParse({
+      name: characterName.trim(),
+      genre: selectedGenre
+    });
+
+    if (!validationResult.success) {
+      const errorMessages = validationResult.error.errors.map(err => err.message).join(', ');
+      setError(errorMessages);
       return;
     }
 
