@@ -85,7 +85,7 @@ export const GenerateStoryRequestSchema = z.object({
   genre: GenreSchema,
   character: CharacterSchema,
   history: z.array(StoryNodeSchema),
-  userInput: z.string().min(1, 'User input is required'),
+  userInput: z.string(),
   isOpening: z.boolean().optional(),
   diceRoll: DiceRollSchema.optional(),
   goal: GameGoalSchema.optional(),
@@ -93,8 +93,21 @@ export const GenerateStoryRequestSchema = z.object({
   isGoalSelection: z.boolean().optional(),
   isEnding: z.boolean().optional(),
   model: z.enum(['glm-4', 'glm-4.6', 'glm-4.5-x', 'glm-4.5-x-thinking']).optional(),
-  phase: GamePhaseSchema.optional()
-});
+  phase: GamePhaseSchema.optional(),
+  maxRounds: z.number().min(1).optional()
+}).refine(
+  (data) => {
+    // User input is required unless it's an opening or ending
+    if (data.isOpening || data.isEnding) {
+      return true; // userInput can be empty
+    }
+    return data.userInput.length > 0; // userInput must have content
+  },
+  {
+    message: 'User input is required for gameplay choices',
+    path: ['userInput']
+  }
+);
 
 export const GenerateStoryResponseSchema = z.object({
   content: z.string().min(1, 'Story content is required'),

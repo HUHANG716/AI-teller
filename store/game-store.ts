@@ -8,6 +8,7 @@ import { saveGame, getGameById, setCurrentGameId } from '@/lib/storage';
 import { performDiceCheck, suggestDifficulty } from '@/lib/dice-engine';
 import { gameLogger } from '@/lib/logger';
 import { ZhipuModel } from '@/lib/ai-service';
+import { GenerateStoryRequestSchema, GenerateStoryResponseSchema, type GenerateStoryRequest, type GenerateStoryResponse } from '@/lib/schemas';
 
 // Helper function to get current model selection from localStorage
 function getCurrentModel(): ZhipuModel | undefined {
@@ -77,21 +78,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
+      // Create request data with type annotation
+      const requestData: GenerateStoryRequest = {
+        genre,
+        character,
+        history: [],
+        userInput: '',
+        isOpening: true,
+        roundNumber: 1,  // 第1轮
+        phase: 'opening', // 开场阶段
+        maxRounds: GAME_CONFIG.defaultMaxRounds,
+        model: getCurrentModel(), // 传递当前选择的模型
+      };
+
       // Call API to generate opening story
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          genre,
-          character,
-          history: [],
-          userInput: '',
-          isOpening: true,
-          roundNumber: 1,  // 第1轮
-          phase: 'opening', // 开场阶段
-          maxRounds: GAME_CONFIG.defaultMaxRounds,
-          model: getCurrentModel(), // 传递当前选择的模型
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
@@ -100,11 +104,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const responseData = await response.json();
 
+      // Validate response data using Zod schema (important for external API)
+      const responseValidation = GenerateStoryResponseSchema.safeParse(responseData);
+      if (!responseValidation.success) {
+        console.error('❌ [startNewGame] 响应验证失败:', responseValidation.error.issues);
+        throw new Error(`Invalid response: ${responseValidation.error.issues.map(i => i.message).join(', ')}`);
+      }
+
       // Store raw response for debugging
       set({ lastAIResponse: responseData });
       console.log('📥 开场AI原始响应:', JSON.stringify(responseData, null, 2));
 
-      const { content, choices } = responseData;
+      const { content, choices } = responseValidation.data;
 
       // Create the opening story node
       const openingNode: StoryNode = {
@@ -243,21 +254,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
         maxRounds: updatedGame.maxRounds
       });
       
+      // Create request data with type annotation
+      const requestData: GenerateStoryRequest = {
+        genre: updatedGame.genre,
+        character: updatedGame.character,
+        history: updatedNodes,
+        userInput: `选择目标：${goal.description}`,
+        isOpening: false,
+        goal: gameGoal,
+        roundNumber: nextRoundNumber,
+        phase,
+        maxRounds: updatedGame.maxRounds,
+        model: getCurrentModel(), // 传递当前选择的模型
+      };
+
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          genre: updatedGame.genre,
-          character: updatedGame.character,
-          history: updatedNodes,
-          userInput: `选择目标：${goal.description}`,
-          isOpening: false,
-          goal: gameGoal,
-          roundNumber: nextRoundNumber,
-          phase,
-          maxRounds: updatedGame.maxRounds,
-          model: getCurrentModel(), // 传递当前选择的模型
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
@@ -265,9 +279,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
 
       const responseData = await response.json();
+
+      // Validate response data using Zod schema
+      const responseValidation = GenerateStoryResponseSchema.safeParse(responseData);
+      if (!responseValidation.success) {
+        console.error('❌ [selectGoal] 响应验证失败:', responseValidation.error.issues);
+        throw new Error(`Invalid response: ${responseValidation.error.issues.map(i => i.message).join(', ')}`);
+      }
+
       set({ lastAIResponse: responseData });
 
-      const { content, choices, goalProgress } = responseData;
+      const { content, choices, goalProgress } = responseValidation.data;
 
       // Handle goal progress update
       let finalGoal = gameGoal;
@@ -333,21 +355,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({ isLoading: true, error: null });
 
     try {
+      // Create request data with type annotation
+      const requestData: GenerateStoryRequest = {
+        genre: currentGame.genre,
+        character: currentGame.character,
+        history: currentGame.storyNodes,
+        userInput: '',
+        isEnding: true,
+        phase: 'ending',
+        goal: currentGame.goal,
+        roundNumber: currentGame.currentNodeIndex + 2, // 当前是结局轮
+        maxRounds: currentGame.maxRounds,
+        model: getCurrentModel(), // 传递当前选择的模型
+      };
+
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          genre: currentGame.genre,
-          character: currentGame.character,
-          history: currentGame.storyNodes,
-          userInput: '',
-          isEnding: true,
-          phase: 'ending',
-          goal: currentGame.goal,
-          roundNumber: currentGame.currentNodeIndex + 2, // 当前是结局轮
-          maxRounds: currentGame.maxRounds,
-          model: getCurrentModel(), // 传递当前选择的模型
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
@@ -356,11 +381,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const responseData = await response.json();
 
+      // Validate response data using Zod schema
+      const responseValidation = GenerateStoryResponseSchema.safeParse(responseData);
+      if (!responseValidation.success) {
+        console.error('❌ [generateEnding] 响应验证失败:', responseValidation.error.issues);
+        throw new Error(`Invalid response: ${responseValidation.error.issues.map(i => i.message).join(', ')}`);
+      }
+
       // Store raw response for debugging
       set({ lastAIResponse: responseData });
       console.log('📥 结局AI原始响应:', JSON.stringify(responseData, null, 2));
 
-      const { content, ending } = responseData;
+      const { content, ending } = responseValidation.data;
 
       if (!ending) {
         throw new Error('No ending in response');
@@ -570,24 +602,27 @@ export const useGameStore = create<GameStore>((set, get) => ({
         }
       });
 
+      // Create request data with type annotation
+      const requestData: GenerateStoryRequest = {
+        genre: currentGame.genre,
+        character: currentGame.character,
+        history: updatedNodes,
+        userInput: choiceText,
+        diceRoll,
+        isOpening: false,
+        goal: currentGame.goal,
+        roundNumber: nextRoundNumber,
+        maxRounds: currentGame.maxRounds,
+        phase,
+        isGoalSelection,
+        model: getCurrentModel(), // 传递当前选择的模型
+      };
+
       // Call API to generate next story segment
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          genre: currentGame.genre,
-          character: currentGame.character,
-          history: updatedNodes,
-          userInput: choiceText,
-          diceRoll,
-          isOpening: false,
-          goal: currentGame.goal,
-          roundNumber: nextRoundNumber,
-          maxRounds: currentGame.maxRounds,
-          phase,
-          isGoalSelection,
-          model: getCurrentModel(), // 传递当前选择的模型
-        }),
+        body: JSON.stringify(requestData),
       });
 
       if (!response.ok) {
@@ -596,10 +631,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const responseData = await response.json();
 
+      // Validate response data using Zod schema
+      const responseValidation = GenerateStoryResponseSchema.safeParse(responseData);
+      if (!responseValidation.success) {
+        console.error('❌ [makeChoice] 响应验证失败:', responseValidation.error.issues);
+        throw new Error(`Invalid response: ${responseValidation.error.issues.map(i => i.message).join(', ')}`);
+      }
+
       // Store raw response for debugging
       set({ lastAIResponse: responseData });
 
-      const { content, choices, goalOptions, goalProgress, ending } = responseData;
+      const { content, choices, goalOptions, goalProgress, ending } = responseValidation.data;
 
       // Log response data for debugging
       console.log('📥 AI原始响应:', JSON.stringify(responseData, null, 2));
