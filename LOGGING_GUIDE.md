@@ -58,7 +58,7 @@ AI说书人使用 **Pino** 日志库提供完整的调试和监控能力。日�
 **示例输出：**
 ```
 🤖 [10:30:16] INFO: AI generation started {
-  provider: "openrouter",
+  provider: "zhipu",
   genre: "wuxia",
   characterName: "李逍遥",
   historyLength: 3,
@@ -222,7 +222,7 @@ storageLogger.error({ error }, 'Error message');
     total: 9
     
 [10:30:16] INFO (🤖 AI): AI generation started
-    provider: "openrouter"
+    provider: "zhipu"
     genre: "wuxia"
     hasDiceRoll: true
 ```
@@ -316,7 +316,7 @@ gameLogger.info({ duration: `${duration}ms` }, 'Operation completed');
 **调试步骤:**
 1. 查找 🤖 日志的 `AI generation started`
 2. 查看 `duration` 字段
-3. 比较不同 `provider` 的响应时间
+3. 检查网络连接是否稳定
 4. 检查 `historyLength` 是否过长
 
 ### 场景3: 存储空间不足

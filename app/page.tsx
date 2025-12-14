@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 import { GameState } from '@/lib/types';
 import { getAllGames, deleteGame } from '@/lib/storage';
 import { useGameStore } from '@/store/game-store';
-import ModelSelector from '@/components/model-selector';
+import ZhipuModelSelector from '@/components/zhipu-model-selector';
 
 export default function Home() {
   const router = useRouter();
@@ -177,8 +177,8 @@ export default function Home() {
         )}
       </div>
 
-      {/* Model Selector */}
-      <ModelSelector />
+      {/* Zhipu Model Selector */}
+      <ZhipuModelSelector />
     </main>
   );
 }

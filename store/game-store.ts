@@ -7,6 +7,24 @@ import {
 import { saveGame, getGameById, setCurrentGameId } from '@/lib/storage';
 import { performDiceCheck, suggestDifficulty } from '@/lib/dice-engine';
 import { gameLogger } from '@/lib/logger';
+import { ZhipuModel } from '@/lib/ai-service';
+
+// Helper function to get current model selection from localStorage
+function getCurrentModel(): ZhipuModel | undefined {
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('ai-teller-zhipu-model');
+    console.log('🔍 [store getCurrentModel] localStorage读取:', saved);
+    if (saved) {
+      console.log('✅ [store getCurrentModel] 返回模型:', saved);
+      return saved as ZhipuModel;
+    } else {
+      console.log('⚠️ [store getCurrentModel] localStorage为空，返回undefined');
+    }
+  } else {
+    console.log('⚠️ [store getCurrentModel] 不在浏览器环境，返回undefined');
+  }
+  return undefined;
+}
 
 interface GameStore {
   // State
@@ -69,6 +87,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           history: [],
           userInput: '',
           isOpening: true,
+          model: getCurrentModel(), // 传递当前选择的模型
         }),
       });
 
@@ -223,6 +242,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           isOpening: false,
           goal: gameGoal,
           roundNumber: 4, // Now generating round 4
+          model: getCurrentModel(), // 传递当前选择的模型
         }),
       });
 
@@ -309,6 +329,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           userInput: '',
           isEnding: true,
           goal: currentGame.goal,
+          model: getCurrentModel(), // 传递当前选择的模型
         }),
       });
 
@@ -532,6 +553,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           maxRounds: currentGame.maxRounds,
           phase,
           isGoalSelection,
+          model: getCurrentModel(), // 传递当前选择的模型
         }),
       });
 

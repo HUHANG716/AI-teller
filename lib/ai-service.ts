@@ -1,10 +1,45 @@
-// AI service layer supporting multiple Chinese LLM providers
+// AI service layer using Zhipu AI (智谱GLM)
 import { Genre, Character, StoryNode, GenerateStoryResponse, DiceRoll, GameGoal, GamePhase, DiceOutcome } from './types';
 import { buildPrompt } from './prompt-templates';
 import { aiLogger, logPerformance } from './logger';
 
-type AIProvider = 'qwen' | 'zhipu' | 'wenxin' | 'openrouter';
-type OpenRouterModel = 'deepseek-v3' | 'qwen-2.5-7b';
+// 支持的智谱AI模型
+export type ZhipuModel = 'glm-4' | 'glm-4.6' | 'glm-4.5-x' | 'glm-4.5-x-thinking';
+
+// 模型配置
+export const ZHIPU_MODELS = {
+  'glm-4': { name: 'GLM-4', desc: '标准模型，平衡性能与成本', modelId: 'glm-4', thinking: false },
+  'glm-4.6': { name: 'GLM-4.6', desc: '增强版，更强的推理能力', modelId: 'glm-4.6', thinking: false },
+  'glm-4.5-x': { name: 'GLM-4.5-X', desc: '快速响应，适合复杂剧情', modelId: 'glm-4.5-x', thinking: false },
+  'glm-4.5-x-thinking': { name: 'GLM-4.5-X (Thinking)', desc: '深度思考模式，最强推理', modelId: 'glm-4.5-x', thinking: true },
+} as const;
+
+/**
+ * 获取当前选择的模型（从localStorage或环境变量）
+ */
+export function getSelectedModel(): ZhipuModel {
+  // 优先从localStorage读取（用户选择）
+  if (typeof window !== 'undefined') {
+    const saved = localStorage.getItem('ai-teller-zhipu-model');
+    console.log('🔍 [getSelectedModel] localStorage值:', saved);
+    if (saved && saved in ZHIPU_MODELS) {
+      console.log('✅ [getSelectedModel] 使用localStorage模型:', saved);
+      return saved as ZhipuModel;
+    }
+  }
+  
+  // 否则从环境变量读取
+  const envModel = process.env.ZHIPU_MODEL as ZhipuModel;
+  console.log('🔍 [getSelectedModel] 环境变量ZHIPU_MODEL:', envModel);
+  if (envModel && envModel in ZHIPU_MODELS) {
+    console.log('✅ [getSelectedModel] 使用环境变量模型:', envModel);
+    return envModel;
+  }
+  
+  // 默认使用 glm-4
+  console.log('⚠️ [getSelectedModel] 使用默认模型: glm-4');
+  return 'glm-4';  // 🔴 修复：这里应该返回默认值，而不是抛出错误！
+}
 
 /**
  * Main function to generate story content using AI
@@ -23,12 +58,13 @@ export async function generateStory(params: {
   previousOutcome?: DiceOutcome | null;
   isGoalSelection?: boolean;
   isEnding?: boolean;
+  model?: ZhipuModel; // 允许从客户端传递模型选择
 }): Promise<GenerateStoryResponse> {
   const startTime = Date.now();
-  const provider = (process.env.AI_MODEL_PROVIDER || 'openrouter') as AIProvider;
   
   aiLogger.info({ 
-    provider, 
+    provider: 'zhipu',
+    model: params.model,
     genre: params.genre,
     characterName: params.character.name,
     historyLength: params.history.length,
@@ -38,24 +74,7 @@ export async function generateStory(params: {
   }, 'AI generation started');
   
   try {
-    let result: GenerateStoryResponse;
-    
-    switch (provider) {
-      case 'openrouter':
-        result = await callOpenRouterAPI(params as any);
-        break;
-      case 'qwen':
-        result = await callQwenAPI(params as any);
-        break;
-      case 'zhipu':
-        result = await callZhipuAPI(params as any);
-        break;
-      case 'wenxin':
-        result = await callWenxinAPI(params as any);
-        break;
-      default:
-        throw new Error(`Unknown AI provider: ${provider}`);
-    }
+    const result = await callZhipuAPI(params);
     
     logPerformance(aiLogger, 'AI generation', startTime);
     aiLogger.debug({ 
@@ -67,242 +86,9 @@ export async function generateStory(params: {
   } catch (error) {
     aiLogger.error({ 
       error: error instanceof Error ? error.message : String(error), 
-      provider,
+      provider: 'zhipu',
       duration: `${Date.now() - startTime}ms`
     }, 'AI generation failed');
-    throw error;
-  }
-}
-
-/**
- * Call OpenRouter API (支持 DeepSeek V3, Qwen 2.5 7B 等多个模型)
- */
-async function callOpenRouterAPI(params: {
-  genre: Genre;
-  character: Character;
-  history: StoryNode[];
-  userInput: string;
-  isOpening?: boolean;
-  diceRoll?: DiceRoll;
-  goal?: GameGoal;
-  roundNumber?: number;
-  maxRounds?: number;
-  phase?: GamePhase;
-  previousOutcome?: DiceOutcome | null;
-  isGoalSelection?: boolean;
-  isEnding?: boolean;
-}): Promise<GenerateStoryResponse> {
-  const startTime = Date.now();
-  const apiKey = process.env.OPENROUTER_API_KEY;
-
-  if (!apiKey) {
-    aiLogger.error('OPENROUTER_API_KEY not configured');
-    throw new Error('OPENROUTER_API_KEY not configured');
-  }
-
-  const { system, user } = buildPrompt(
-    params.genre,
-    params.character,
-    params.history,
-    params.userInput,
-    params.isOpening,
-    params.diceRoll,
-    params.roundNumber,
-    params.maxRounds,
-    params.phase,
-    params.goal,
-    params.isGoalSelection,
-    params.isEnding
-  );
-  
-  aiLogger.info({
-    genre: params.genre,
-    characterName: params.character.name,
-    isOpening: params.isOpening,
-    hasDiceRoll: !!params.diceRoll,
-    hasGoal: !!params.goal,
-    goalDescription: params.goal?.goal?.description,
-    roundNumber: params.roundNumber,
-    isGoalSelection: params.isGoalSelection
-  }, 'Starting OpenRouter API call');
-
-  // 模型映射
-  const modelMap: Record<OpenRouterModel, string> = {
-    'deepseek-v3': 'deepseek/deepseek-chat',
-    'qwen-2.5-7b': 'qwen/qwen-2.5-7b-instruct',
-  };
-
-  const selectedModel = (process.env.AI_MODEL || 'deepseek-v3') as OpenRouterModel;
-  const modelId = modelMap[selectedModel] || modelMap['deepseek-v3'];
-
-  try {
-    aiLogger.debug({ 
-      model: modelId, 
-      systemPromptLength: system.length,
-      userPromptLength: user.length,
-      apiUrl: 'https://openrouter.ai/api/v1/chat/completions'
-    }, 'Preparing OpenRouter API request');
-
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-        'X-Title': 'AI Storyteller',
-      },
-      body: JSON.stringify({
-        model: modelId,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        temperature: 0.8,
-        max_tokens: 1000,
-      }),
-      // Add timeout and signal for better error handling
-      signal: AbortSignal.timeout(30000), // 30 second timeout
-    });
-
-    aiLogger.debug({ 
-      status: response.status, 
-      statusText: response.statusText 
-    }, 'OpenRouter API response received');
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      aiLogger.error({ 
-        status: response.status, 
-        statusText: response.statusText,
-        errorData,
-        provider: 'openrouter'
-      }, 'OpenRouter API returned error status');
-      throw new Error(`OpenRouter API error: ${response.status} - ${JSON.stringify(errorData)}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    
-    if (!content) {
-      aiLogger.error({ data }, 'No content in OpenRouter response');
-      throw new Error('No content in OpenRouter response');
-    }
-
-    aiLogger.info({ 
-      contentLength: content.length,
-      model: modelId 
-    }, 'OpenRouter API call successful');
-
-    return parseAIResponse(content);
-  } catch (error) {
-    const duration = Date.now() - startTime;
-    const errorDetails: any = {
-      errorType: error instanceof Error ? error.constructor.name : typeof error,
-      message: error instanceof Error ? error.message : 'Unknown error',
-      provider: 'openrouter',
-      duration: `${duration}ms`
-    };
-
-    // Add more details for network errors
-    if (error instanceof Error) {
-      if ('cause' in error) {
-        errorDetails.cause = error.cause;
-      }
-      if ('code' in error) {
-        errorDetails.code = (error as any).code;
-      }
-    }
-
-    aiLogger.error(errorDetails, 'OpenRouter API call failed');
-    
-    // Provide more helpful error messages
-    if (error instanceof Error) {
-      if (error.message.includes('fetch failed') || error.message.includes('ECONNRESET')) {
-        throw new Error('网络连接失败。可能原因：\n1. 网络连接不稳定\n2. 需要VPN/代理访问OpenRouter\n3. API密钥无效\n\n请检查网络设置或使用Mock模式测试');
-      }
-      if (error.name === 'AbortError' || error.message.includes('timeout')) {
-        throw new Error('请求超时（30秒），OpenRouter响应时间过长，请稍后重试');
-      }
-    }
-    
-    throw error;
-  }
-}
-
-/**
- * Call Alibaba Qwen (通义千问) API
- */
-async function callQwenAPI(params: {
-  genre: Genre;
-  character: Character;
-  history: StoryNode[];
-  userInput: string;
-  isOpening?: boolean;
-  diceRoll?: DiceRoll;
-  goal?: GameGoal;
-  roundNumber?: number;
-  maxRounds?: number;
-  phase?: GamePhase;
-  previousOutcome?: DiceOutcome | null;
-  isGoalSelection?: boolean;
-  isEnding?: boolean;
-}): Promise<GenerateStoryResponse> {
-  const apiKey = process.env.QWEN_API_KEY;
-
-  if (!apiKey) {
-    throw new Error('QWEN_API_KEY not configured');
-  }
-
-  const { system, user } = buildPrompt(
-    params.genre,
-    params.character,
-    params.history,
-    params.userInput,
-    params.isOpening,
-    params.diceRoll,
-    params.roundNumber,
-    params.maxRounds,
-    params.phase,
-    params.goal,
-    params.isGoalSelection,
-    params.isEnding
-  );
-
-  try {
-    const response = await fetch('https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'qwen-max',
-        input: {
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: user },
-          ],
-        },
-        parameters: {
-          result_format: 'message',
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Qwen API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.output?.choices?.[0]?.message?.content;
-    
-    if (!content) {
-      throw new Error('No content in Qwen response');
-    }
-
-    return parseAIResponse(content);
-  } catch (error) {
-    console.error('Qwen API error:', error);
     throw error;
   }
 }
@@ -324,12 +110,27 @@ async function callZhipuAPI(params: {
   previousOutcome?: DiceOutcome | null;
   isGoalSelection?: boolean;
   isEnding?: boolean;
+  model?: ZhipuModel;
 }): Promise<GenerateStoryResponse> {
+  const startTime = Date.now();
   const apiKey = process.env.ZHIPU_API_KEY;
 
   if (!apiKey) {
-    throw new Error('ZHIPU_API_KEY not configured');
+    aiLogger.error('ZHIPU_API_KEY not configured');
+    throw new Error('ZHIPU_API_KEY 未配置，请在环境变量中设置');
   }
+
+  // 获取选择的模型配置（优先使用传入的model参数）
+  const selectedModel = params.model || getSelectedModel();
+  console.log('🔍 [callZhipuAPI] 最终使用的模型:', selectedModel, '来源:', params.model ? '参数传递' : 'getSelectedModel()');
+  
+  const modelConfig = ZHIPU_MODELS[selectedModel];
+  if (!modelConfig) {
+    aiLogger.error({ selectedModel }, 'Invalid model selected');
+    throw new Error(`无效的模型: ${selectedModel}，支持的模型: ${Object.keys(ZHIPU_MODELS).join(', ')}`);
+  }
+  
+  const isThinkingMode = modelConfig.thinking;
 
   const { system, user } = buildPrompt(
     params.genre,
@@ -346,123 +147,165 @@ async function callZhipuAPI(params: {
     params.isEnding
   );
 
+  aiLogger.info({
+    genre: params.genre,
+    characterName: params.character.name,
+    model: selectedModel,
+    thinkingMode: isThinkingMode,
+    isOpening: params.isOpening,
+    hasDiceRoll: !!params.diceRoll,
+    hasGoal: !!params.goal,
+    goalDescription: params.goal?.goal?.description,
+    roundNumber: params.roundNumber,
+    isGoalSelection: params.isGoalSelection
+  }, 'Starting Zhipu API call');
+
   try {
+    aiLogger.debug({ 
+      model: modelConfig.modelId,
+      selectedOption: selectedModel,
+      thinkingMode: isThinkingMode,
+      systemPromptLength: system.length,
+      userPromptLength: user.length,
+      apiUrl: 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+    }, 'Preparing Zhipu API request');
+
+    // 构建请求体
+    const requestBody: any = {
+      model: modelConfig.modelId,
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+
+        temperature: 1,
+        max_tokens: 4000,  // 增加到2000，避免推理模式输出被截断
+        thinking: {
+          type: isThinkingMode ? "enabled" : "disabled"
+        }
+    };
+
+
     const response = await fetch('https://open.bigmodel.cn/api/paas/v4/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model: 'glm-4',
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-      }),
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(isThinkingMode ? 60000 : 30000), // thinking模式60秒超时
     });
 
+    aiLogger.debug({ 
+      status: response.status, 
+      statusText: response.statusText 
+    }, 'Zhipu API response received');
+
     if (!response.ok) {
-      throw new Error(`Zhipu API error: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      aiLogger.error({ 
+        status: response.status, 
+        statusText: response.statusText,
+        errorData,
+        provider: 'zhipu',
+        model: selectedModel
+      }, 'Zhipu API returned error status');
+      throw new Error(`智谱 API 错误: ${response.status} - ${JSON.stringify(errorData)}`);
     }
 
     const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
     
-    if (!content) {
-      throw new Error('No content in Zhipu response');
-    }
-
-    return parseAIResponse(content);
-  } catch (error) {
-    console.error('Zhipu API error:', error);
-    throw error;
-  }
-}
-
-/**
- * Call Baidu Wenxin (文心一言) API
- */
-async function callWenxinAPI(params: {
-  genre: Genre;
-  character: Character;
-  history: StoryNode[];
-  userInput: string;
-  isOpening?: boolean;
-  diceRoll?: DiceRoll;
-  goal?: GameGoal;
-  roundNumber?: number;
-  maxRounds?: number;
-  phase?: GamePhase;
-  previousOutcome?: DiceOutcome | null;
-  isGoalSelection?: boolean;
-  isEnding?: boolean;
-}): Promise<GenerateStoryResponse> {
-  const apiKey = process.env.WENXIN_API_KEY;
-  const secretKey = process.env.WENXIN_SECRET_KEY;
-
-  if (!apiKey || !secretKey) {
-    throw new Error('WENXIN_API_KEY or WENXIN_SECRET_KEY not configured');
-  }
-
-  // First, get access token
-  const tokenResponse = await fetch(
-    `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${apiKey}&client_secret=${secretKey}`,
-    { method: 'POST' }
-  );
-
-  const tokenData = await tokenResponse.json();
-  const accessToken = tokenData.access_token;
-
-  if (!accessToken) {
-    throw new Error('Failed to get Wenxin access token');
-  }
-
-  const { system, user } = buildPrompt(
-    params.genre,
-    params.character,
-    params.history,
-    params.userInput,
-    params.isOpening,
-    params.diceRoll,
-    params.roundNumber,
-    params.maxRounds,
-    params.phase,
-    params.goal,
-    params.isGoalSelection,
-    params.isEnding
-  );
-
-  try {
-    const response = await fetch(
-      `https://aip.baidubce.com/rpc/2.0/ai_custom/v1/wenxinworkshop/chat/completions?access_token=${accessToken}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            { role: 'user', content: `${system}\n\n${user}` },
-          ],
-        }),
+    // 处理不同模式的响应
+    let content: string = '';
+    const message = data.choices?.[0]?.message;
+    
+    if (isThinkingMode && message?.tool_calls) {
+      // Thinking模式（通过tools参数启用）
+      const thinkResult = message.tool_calls?.[0]?.function?.arguments;
+      content = message.content || thinkResult || '';
+      console.log('✅ [Thinking Mode] 提取content，长度:', content.length);
+    } else if (message?.reasoning_content) {
+      // GLM-4.5-x 自动推理模式：内容在 reasoning_content 字段
+      console.log('⚠️ [GLM-4.5-x] 检测到 reasoning_content，模型自动启用了推理模式');
+      console.log('📝 [reasoning_content] 长度:', message.reasoning_content.length);
+      
+      // 优先使用 content，如果为空则使用 reasoning_content
+      content = message.content || message.reasoning_content || '';
+      
+      if (!message.content && message.reasoning_content) {
+        console.log('⚠️ content为空，使用 reasoning_content 作为内容');
+        // reasoning_content 通常是推理过程，需要提取实际内容
+        // 如果finish_reason是length，说明输出被截断了
+        if (data.choices?.[0]?.finish_reason === 'length') {
+          console.log('⚠️ finish_reason=length，输出被截断，需要增加max_tokens');
+        }
       }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Wenxin API error: ${response.status}`);
+    } else {
+      // 普通模式
+      content = message?.content || '';
+      console.log('✅ [Normal Mode] 提取content，长度:', content.length);
     }
-
-    const data = await response.json();
-    const content = data.result;
     
     if (!content) {
-      throw new Error('No content in Wenxin response');
+      console.error('❌ [Zhipu] 所有字段都为空！');
+      console.error('message.content:', message?.content);
+      console.error('message.reasoning_content:', message?.reasoning_content);
+      console.error('finish_reason:', data.choices?.[0]?.finish_reason);
+      
+      aiLogger.error({ 
+        hasContent: !!message?.content,
+        hasReasoningContent: !!message?.reasoning_content,
+        finishReason: data.choices?.[0]?.finish_reason,
+        message: message
+      }, 'No content in Zhipu response');
+      
+      throw new Error('智谱 API 返回内容为空。可能原因：\n1. max_tokens太小导致输出被截断\n2. 模型启用了推理模式但没有输出最终内容');
     }
+    
+    console.log('✅ [Zhipu] 成功提取content，长度:', content.length);
+
+    aiLogger.info({ 
+      contentLength: content.length,
+      model: modelConfig.modelId,
+      selectedOption: selectedModel,
+      thinkingMode: isThinkingMode
+    }, 'Zhipu API call successful');
 
     return parseAIResponse(content);
   } catch (error) {
-    console.error('Wenxin API error:', error);
+    const duration = Date.now() - startTime;
+    const errorDetails: any = {
+      errorType: error instanceof Error ? error.constructor.name : typeof error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      provider: 'zhipu',
+      model: modelConfig.modelId,
+      selectedOption: selectedModel,
+      thinkingMode: isThinkingMode,
+      duration: `${duration}ms`
+    };
+
+    if (error instanceof Error) {
+      if ('cause' in error) {
+        errorDetails.cause = error.cause;
+      }
+      if ('code' in error) {
+        errorDetails.code = (error as any).code;
+      }
+    }
+
+    aiLogger.error(errorDetails, 'Zhipu API call failed');
+    
+    // Provide more helpful error messages
+    if (error instanceof Error) {
+      if (error.message.includes('fetch failed') || error.message.includes('ECONNRESET')) {
+        throw new Error('网络连接失败。可能原因：\n1. 网络连接不稳定\n2. API密钥无效\n\n请检查网络设置和API密钥配置');
+      }
+      if (error.name === 'AbortError' || error.message.includes('timeout')) {
+        const timeoutMsg = isThinkingMode ? '60秒' : '30秒';
+        throw new Error(`请求超时（${timeoutMsg}），智谱AI响应时间过长，请稍后重试`);
+      }
+    }
+    
     throw error;
   }
 }

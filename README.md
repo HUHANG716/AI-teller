@@ -4,7 +4,7 @@
 
 ## ✨ 功能特点
 
-- 🎭 **AI动态生成**: 基于国产大模型(通义千问/智谱/文心一言)生成独特剧情
+- 🎭 **AI动态生成**: 基于智谱AI多模型支持（GLM-4/GLM-4.6/GLM-4.5-X/Thinking模式）
 - ⚔️ **多种题材**: 武侠江湖、都市灵异、浴血黑帮等题材
 - 🎮 **互动选择**: 3个预设选项 + 自定义输入
 - 🎲 **骰子判定**: TRPG风格的2D6判定系统，特质提供加成
@@ -26,44 +26,26 @@ npm install
 复制 `.env.local` 并配置你的API密钥：
 
 ```bash
-# OpenRouter (推荐 - 支持多个模型)
-OPENROUTER_API_KEY=your_openrouter_api_key
-AI_MODEL_PROVIDER=openrouter
-AI_MODEL=deepseek-v3  # 可选: deepseek-v3 或 qwen-2.5-7b
+# 智谱AI API密钥（必需）
+ZHIPU_API_KEY=your_zhipu_api_key
 
-# 或者使用其他平台（三选一）
-# 通义千问
-# QWEN_API_KEY=your_qwen_api_key
-# AI_MODEL_PROVIDER=qwen
-
-# 智谱GLM
-# ZHIPU_API_KEY=your_zhipu_api_key
-# AI_MODEL_PROVIDER=zhipu
-
-# 文心一言
-# WENXIN_API_KEY=your_wenxin_api_key
-# WENXIN_SECRET_KEY=your_wenxin_secret_key
-# AI_MODEL_PROVIDER=wenxin
+# 可选：设置默认模型（不设置则默认为 glm-4）
+ZHIPU_MODEL=glm-4  # 可选: glm-4, glm-4.6, glm-4.5-x, glm-4.5-x-thinking
 ```
 
-**🌐 网络问题排查** 
-
-如果遇到 `ECONNRESET` 或 `网络连接失败` 错误：
-
-1. **检查API密钥** - 确认密钥正确且有效
-2. **网络连接** - OpenRouter需要稳定的国际网络
-3. **中国大陆用户**：
-   - 推荐使用VPN/代理访问OpenRouter
-   - 或切换到国内模型（Qwen/Zhipu/Wenxin）
-4. **超时问题** - 当前超时设置为30秒，如果频繁超时可能是网络不稳定
+**支持的模型：**
+- **GLM-4**: 标准模型，平衡性能与成本
+- **GLM-4.6**: 增强版，更强的推理能力
+- **GLM-4.5-X**: 快速响应，适合复杂剧情
+- **GLM-4.5-X (Thinking)**: 深度思考模式，最强推理（响应时间较长）
 
 **获取API密钥：**
-- **OpenRouter (推荐)**: https://openrouter.ai/
-  - 支持 DeepSeek V3、Qwen 2.5 7B 等多个模型
-  - 统一接口，按使用付费
-- 通义千问: https://dashscope.aliyun.com/
 - 智谱AI: https://open.bigmodel.cn/
-- 文心一言: https://cloud.baidu.com/product/wenxinworkshop
+  - 注册并创建API密钥
+  - 支持多个模型自由切换
+  - 按使用量付费
+
+**注意**: 在应用中可通过右下角的模型选择器随时切换模型，无需重启服务。
 
 **注意**: 如果没有配置API密钥，系统会使用模拟数据进行演示。
 
@@ -124,7 +106,7 @@ npm run dev
 - **状态管理**: Zustand
 - **动画**: Framer Motion
 - **存储**: localStorage
-- **AI模型**: OpenRouter (DeepSeek V3/Qwen 2.5 7B) 或其他国产模型
+- **AI模型**: 智谱AI GLM-4
 - **日志**: Pino (高性能日志库)
 - **骰子系统**: 2D6 TRPG判定
 

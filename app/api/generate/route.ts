@@ -1,6 +1,6 @@
 // API route for AI story generation
 import { NextRequest, NextResponse } from 'next/server';
-import { generateStory, mockGenerateStory } from '@/lib/ai-service';
+import { generateStory, mockGenerateStory, ZhipuModel } from '@/lib/ai-service';
 import { Genre, Character, StoryNode, DiceRoll, GameGoal } from '@/lib/types';
 import { apiLogger } from '@/lib/logger';
 
@@ -19,7 +19,8 @@ export async function POST(req: NextRequest) {
       goal,
       roundNumber,
       isGoalSelection,
-      isEnding
+      isEnding,
+      model  // 🔴 关键：从请求体解构 model
     } = body as {
       genre: Genre;
       character: Character;
@@ -31,7 +32,11 @@ export async function POST(req: NextRequest) {
       roundNumber?: number;
       isGoalSelection?: boolean;
       isEnding?: boolean;
+      model?: ZhipuModel;  // 🔴 添加类型定义
     };
+    
+    // 🔍 Debug: 打印接收到的 model 参数
+    console.log('🔍 [API] 收到的model参数:', model || '未指定');
 
     apiLogger.info({
       endpoint: '/api/generate',
@@ -79,7 +84,8 @@ export async function POST(req: NextRequest) {
           goal,
           roundNumber,
           isGoalSelection,
-          isEnding
+          isEnding,
+          model
         });
 
     const duration = Date.now() - startTime;

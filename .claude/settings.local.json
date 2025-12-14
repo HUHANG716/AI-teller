@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build)",
+      "Bash(npm list:*)",
+      "Bash(npm install axios@^1.7.0 axios-retry@^3.9.0 zod@^3.23.0)",
+      "Bash(npm test:*)",
+      "Bash(cat:*)"
+    ]
+  }
+}

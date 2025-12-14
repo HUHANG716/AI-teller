@@ -30,9 +30,11 @@ npm run lint     # ESLint check
 - State persisted to localStorage via `lib/storage.ts`
 
 ### AI Integration
-- `lib/ai-service.ts`: Multi-provider support (OpenRouter/Qwen/Zhipu/Wenxin)
+- `lib/ai-service.ts`: Uses Zhipu AI with multiple model support (GLM-4/4.6/4.5-X/4.5-X-Thinking)
+- `components/zhipu-model-selector.tsx`: UI component for model selection (stores in localStorage)
 - `lib/prompt-templates.ts`: Genre-specific prompts with structured JSON output format
 - AI responses must follow strict JSON schema with `content`, `choices`, and optional fields (`goalOptions`, `resourceChanges`, `goalProgress`)
+- Thinking mode uses same `glm-4.5-x` model but with `tools: [{ type: 'think' }]` parameter
 
 ### Dice System
 - `lib/dice-engine.ts`: 2D6 TRPG mechanics
@@ -48,12 +50,17 @@ npm run lint     # ESLint check
 ## Environment Variables
 
 ```bash
-AI_MODEL_PROVIDER=openrouter  # or qwen, zhipu, wenxin
-AI_MODEL=deepseek-v3          # or qwen-2.5-7b
-OPENROUTER_API_KEY=xxx        # Required for OpenRouter
+ZHIPU_API_KEY=xxx        # Required for Zhipu AI
+ZHIPU_MODEL=glm-4        # Optional: glm-4 (default), glm-4.6, glm-4.5-x, glm-4.5-x-thinking
 ```
 
-Without API keys, the system uses mock responses from `mockGenerateStory()`.
+**Models:**
+- `glm-4`: Standard model (default)
+- `glm-4.6`: Enhanced version
+- `glm-4.5-x`: Fast response, complex plots
+- `glm-4.5-x-thinking`: Deep thinking mode (same model as glm-4.5-x but with `tools` parameter for thinking)
+
+Without API key, the system uses mock responses from `mockGenerateStory()`.
 
 ## Adding New Genres
 
