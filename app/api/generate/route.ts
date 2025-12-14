@@ -1,6 +1,6 @@
 // API route for AI story generation
 import { NextRequest, NextResponse } from 'next/server';
-import { generateStory, mockGenerateStory } from '@/lib/ai-service';
+import { generateStory } from '@/lib/ai';
 import { Genre, Character, StoryNode, DiceRoll, GameGoal } from '@/lib/types';
 import { apiLogger } from '@/lib/logger';
 
@@ -19,7 +19,8 @@ export async function POST(req: NextRequest) {
       goal,
       roundNumber,
       isGoalSelection,
-      isEnding
+      isEnding,
+      selectedModel
     } = body as {
       genre: Genre;
       character: Character;
@@ -31,17 +32,39 @@ export async function POST(req: NextRequest) {
       roundNumber?: number;
       isGoalSelection?: boolean;
       isEnding?: boolean;
+      selectedModel?: string;  // Model selected from UI
     };
 
-    apiLogger.info({
+    // Log comprehensive request details
+    apiLogger.info('📥 API Request Received', {
       endpoint: '/api/generate',
-      genre,
-      characterName: character?.name,
-      historyLength: history?.length || 0,
-      isOpening: !!isOpening,
-      hasDiceRoll: !!diceRoll,
-      diceOutcome: diceRoll?.outcome
-    }, 'API request received');
+      requestParams: {
+        genre,
+        character: {
+          name: character?.name,
+        },
+        gameState: {
+          historyLength: history?.length || 0,
+          currentRound: roundNumber,
+          isOpening: !!isOpening,
+          isGoalSelection: !!isGoalSelection,
+          isEnding: !!isEnding,
+          phase: isOpening ? 'opening' : isGoalSelection ? 'goal-selection' : isEnding ? 'ending' : 'development'
+        },
+        diceRoll: diceRoll ? {
+          difficulty: diceRoll.difficulty,
+          outcome: diceRoll.outcome
+        } : null,
+        goal: goal ? {
+          progress: goal.progress?.percentage
+        } : null,
+        userInput: userInput ? {
+          length: userInput.length,
+          content: userInput.length > 100 ? userInput.substring(0, 100) + '...' : userInput
+        } : null,
+        selectedModel
+      }
+    });
 
     // Validate required fields
     if (!genre || !character) {
@@ -57,52 +80,49 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Use mock for development if no API key is configured
-    const useMock = !process.env.OPENROUTER_API_KEY &&
-                     !process.env.QWEN_API_KEY &&
-                     !process.env.ZHIPU_API_KEY &&
-                     !process.env.WENXIN_API_KEY;
-
-    if (useMock) {
-      apiLogger.debug('Using mock AI response (no API key configured)');
-    }
-
-    const result = useMock
-      ? await mockGenerateStory({ genre, character, history, userInput, isOpening, diceRoll })
-      : await generateStory({
-          genre,
-          character,
-          history,
-          userInput,
-          isOpening,
-          diceRoll,
-          goal,
-          roundNumber,
-          isGoalSelection,
-          isEnding
-        });
+    // Generate story - the new AI service automatically falls back to mock if no API keys are configured
+    const result = await generateStory({
+      genre,
+      character,
+      history,
+      userInput,
+      isOpening,
+      diceRoll,
+      goal,
+      roundNumber,
+      isGoalSelection,
+      isEnding,
+      selectedModel  // Pass selected model to generateStory
+    });
 
     const duration = Date.now() - startTime;
 
-    // Log successful response details
-    console.log('✅ API请求成功:', {
+    // Log comprehensive response details
+    const responseDetails = {
       duration: `${duration}ms`,
-      contentLength: result.content?.length || 0,
-      choicesCount: Array.isArray(result.choices) ? result.choices.length : 0,
-      hasGoalOptions: !!result.goalOptions,
-      goalOptionsCount: result.goalOptions?.length || 0,
-      hasGoalProgress: !!result.goalProgress,
-      hasEnding: !!result.ending
-    });
+      response: {
+        contentLength: result.content?.length || 0,
+        contentPreview: result.content?.substring(0, 100) + (result.content?.length > 100 ? '...' : ''),
+        choicesCount: Array.isArray(result.choices) ? result.choices.length : 0,
+        choicesPreview: Array.isArray(result.choices) ? result.choices.slice(0, 2).map(c => typeof c === 'string' ? c.substring(0, 50) + '...' : c.text?.substring(0, 50) + '...') : [],
+        goalOptions: result.goalOptions ? {
+          count: result.goalOptions.length,
+          descriptions: result.goalOptions.map(g => g.description.substring(0, 50) + '...')
+        } : null,
+        goalProgress: result.goalProgress ? {
+          percentage: result.goalProgress.percentage,
+          reason: result.goalProgress.reason
+        } : null,
+        ending: result.ending ? {
+          type: result.ending.type,
+          title: result.ending.title
+        } : null
+      }
+    };
 
-    apiLogger.info({
-      duration: `${duration}ms`,
-      contentLength: result.content?.length || 0,
-      choicesCount: Array.isArray(result.choices) ? result.choices.length : 0,
-      hasGoalOptions: !!result.goalOptions,
-      hasGoalProgress: !!result.goalProgress,
-      hasEnding: !!result.ending
-    }, 'API request completed');
+    console.log('✅ API请求成功:', responseDetails);
+
+    apiLogger.info('📤 API Response Generated', responseDetails);
 
     return NextResponse.json(result);
   } catch (error) {

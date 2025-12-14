@@ -8,6 +8,14 @@ import { saveGame, getGameById, setCurrentGameId } from '@/lib/storage';
 import { performDiceCheck, suggestDifficulty } from '@/lib/dice-engine';
 import { gameLogger } from '@/lib/logger';
 
+// Helper function to get selected model from localStorage
+const getSelectedModel = (): string => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('ai-teller-model') || 'glm-4.6';
+  }
+  return 'glm-4.6';
+};
+
 interface GameStore {
   // State
   currentGame: GameState | null;
@@ -69,6 +77,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           history: [],
           userInput: '',
           isOpening: true,
+          selectedModel: getSelectedModel(),
         }),
       });
 
@@ -223,6 +232,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           isOpening: false,
           goal: gameGoal,
           roundNumber: 4, // Now generating round 4
+          selectedModel: getSelectedModel(),
         }),
       });
 
@@ -309,6 +319,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           userInput: '',
           isEnding: true,
           goal: currentGame.goal,
+          selectedModel: getSelectedModel(),
         }),
       });
 
@@ -532,6 +543,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           maxRounds: currentGame.maxRounds,
           phase,
           isGoalSelection,
+          selectedModel: getSelectedModel(),
         }),
       });
 
@@ -588,35 +600,75 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
 
       // Handle goal progress update
-      if (goalProgress && currentGame.goal) {
-        console.log('📊 目标进度更新:', goalProgress);
-        gameLogger.info({ goalProgress }, 'Goal progress update');
+      if (currentGame.goal) {
+        let finalProgress = goalProgress;
 
-        try {
-          const updatedGoal: GameGoal = {
-            ...currentGame.goal,
-            progress: {
-              ...currentGame.goal.progress,
-              ...goalProgress,
-            },
-          };
-
-          // Check if goal is completed (100% progress)
-          if (goalProgress.percentage >= 100 && !updatedGoal.completedAt) {
-            console.log('🎉 目标达成!', updatedGoal.goal.description);
-            gameLogger.info({ goalId: updatedGoal.goal.id }, 'Goal completed');
-            updatedGoal.completedAt = Date.now();
+        // Validate AI-provided progress
+        if (finalProgress) {
+          // Import validation function
+          const { validateProgress } = await import('../lib/goal-progress');
+          if (!validateProgress(finalProgress)) {
+            console.warn('⚠️ AI提供的进度数据无效，将使用备用计算');
+            gameLogger.warn({
+              invalidProgress: finalProgress,
+              reason: 'Invalid progress format or out of bounds'
+            }, 'Invalid progress from AI');
+            finalProgress = null;
           }
+        }
 
-          const updatedGameWithGoal: GameState = {
-            ...currentGame,
-            goal: updatedGoal,
-          };
-          saveGame(updatedGameWithGoal);
-          set({ currentGame: updatedGameWithGoal });
-        } catch (error) {
-          console.error('❌ 更新目标进度时出错:', error);
-          gameLogger.error({ error, goalProgress }, 'Error updating goal progress');
+        // Fallback calculation if AI didn't provide valid progress
+        if (!finalProgress && choiceObj && diceRoll) {
+          const { calculateGoalProgress } = await import('../lib/goal-progress');
+          finalProgress = calculateGoalProgress(choiceObj, diceRoll, currentGame.goal.progress.percentage);
+          console.log('📊 使用备用进度计算:', finalProgress);
+          gameLogger.info({
+            calculatedProgress: finalProgress,
+            choiceDifficulty: choiceObj.difficulty,
+            diceOutcome: diceRoll.outcome,
+            currentProgress: currentGame.goal.progress.percentage
+          }, 'Using fallback progress calculation');
+        }
+
+        // Apply progress update
+        if (finalProgress) {
+          console.log('📊 目标进度更新:', finalProgress);
+          gameLogger.info({ goalProgress: finalProgress }, 'Goal progress update');
+
+          try {
+            const updatedGoal: GameGoal = {
+              ...currentGame.goal,
+              progress: {
+                ...currentGame.goal.progress,
+                ...finalProgress,
+              },
+            };
+
+            // Check if goal is completed (100% progress)
+            if (finalProgress.percentage >= 100 && !updatedGoal.completedAt) {
+              console.log('🎉 目标达成!', updatedGoal.goal.description);
+              gameLogger.info({ goalId: updatedGoal.goal.id }, 'Goal completed');
+              updatedGoal.completedAt = Date.now();
+            }
+
+            const updatedGameWithGoal: GameState = {
+              ...currentGame,
+              goal: updatedGoal,
+            };
+            saveGame(updatedGameWithGoal);
+            set({ currentGame: updatedGameWithGoal });
+          } catch (error) {
+            console.error('❌ 更新目标进度时出错:', error);
+            gameLogger.error({ error, goalProgress: finalProgress }, 'Error updating goal progress');
+          }
+        } else if (currentRound > GAME_CONFIG.goalSelectionRound) {
+          console.warn('⚠️ 第4轮后应有进度更新，但未提供进度数据');
+          gameLogger.warn({
+            roundNumber: currentRound,
+            hasGoal: !!currentGame.goal,
+            hasChoice: !!choiceObj,
+            hasDiceRoll: !!diceRoll
+          }, 'Missing progress data after goal selection phase');
         }
       }
 
@@ -651,11 +703,34 @@ export const useGameStore = create<GameStore>((set, get) => ({
         goalProgress: updatedGame.goal?.progress.percentage
       }, 'Choice processed, pending node ready');
 
-      // 设置 pendingNode，等待用户点击"继续"
-      // 注意：不清除 currentDiceRoll，让骰子结果继续显示，等 confirmContinue 时再清除
-      set({ currentGame: updatedGame, isLoading: false, pendingNode: newNode });
+      // 根据是否有骰子来决定是否需要 pendingNode
+      if (diceRoll) {
+        // 有骰子：设置 pendingNode，等待用户点击"继续"
+        // 注意：不清除 currentDiceRoll，让骰子结果继续显示，等 confirmContinue 时再清除
+        set({ currentGame: updatedGame, isLoading: false, pendingNode: newNode });
+        gameLogger.info('Using pendingNode for dice roll choice');
+      } else {
+        // 无骰子：直接进入下一轮，不需要 pendingNode
+        const finalGame: GameState = {
+          ...updatedGame,
+          storyNodes: [...updatedGame.storyNodes, newNode],
+          currentNodeIndex: updatedGame.currentNodeIndex + 1,
+          updatedAt: Date.now(),
+        };
 
-      // 不再自动检查结局，等用户点击"继续"后再检查
+        saveGame(finalGame);
+        set({
+          currentGame: finalGame,
+          isLoading: false,
+          pendingNode: undefined, // 确保清除任何pendingNode
+          selectedChoice: null,
+          isRollingDice: false
+        });
+        gameLogger.info('Direct advancement for non-dice choice');
+
+        // 检查是否应该结束游戏
+        await get().checkEnding();
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;

@@ -4,7 +4,7 @@
 
 ## ✨ 功能特点
 
-- 🎭 **AI动态生成**: 基于国产大模型(通义千问/智谱/文心一言)生成独特剧情
+- 🎭 **AI动态生成**: 基于智谱AI生成独特剧情
 - ⚔️ **多种题材**: 武侠江湖、都市灵异、浴血黑帮等题材
 - 🎮 **互动选择**: 3个预设选项 + 自定义输入
 - 🎲 **骰子判定**: TRPG风格的2D6判定系统，特质提供加成
@@ -23,47 +23,18 @@ npm install
 
 ### 2. 配置AI模型
 
-复制 `.env.local` 并配置你的API密钥：
+配置你的API密钥：
 
 ```bash
-# OpenRouter (推荐 - 支持多个模型)
-OPENROUTER_API_KEY=your_openrouter_api_key
-AI_MODEL_PROVIDER=openrouter
-AI_MODEL=deepseek-v3  # 可选: deepseek-v3 或 qwen-2.5-7b
-
-# 或者使用其他平台（三选一）
-# 通义千问
-# QWEN_API_KEY=your_qwen_api_key
-# AI_MODEL_PROVIDER=qwen
-
-# 智谱GLM
-# ZHIPU_API_KEY=your_zhipu_api_key
-# AI_MODEL_PROVIDER=zhipu
-
-# 文心一言
-# WENXIN_API_KEY=your_wenxin_api_key
-# WENXIN_SECRET_KEY=your_wenxin_secret_key
-# AI_MODEL_PROVIDER=wenxin
+# 智谱AI
+ZHIPU_API_KEY=your_zhipu_api_key
+AI_MODEL_PROVIDER=zhipu
 ```
 
-**🌐 网络问题排查** 
-
-如果遇到 `ECONNRESET` 或 `网络连接失败` 错误：
-
-1. **检查API密钥** - 确认密钥正确且有效
-2. **网络连接** - OpenRouter需要稳定的国际网络
-3. **中国大陆用户**：
-   - 推荐使用VPN/代理访问OpenRouter
-   - 或切换到国内模型（Qwen/Zhipu/Wenxin）
-4. **超时问题** - 当前超时设置为30秒，如果频繁超时可能是网络不稳定
-
 **获取API密钥：**
-- **OpenRouter (推荐)**: https://openrouter.ai/
-  - 支持 DeepSeek V3、Qwen 2.5 7B 等多个模型
-  - 统一接口，按使用付费
-- 通义千问: https://dashscope.aliyun.com/
-- 智谱AI: https://open.bigmodel.cn/
-- 文心一言: https://cloud.baidu.com/product/wenxinworkshop
+- **智谱AI**: https://open.bigmodel.cn/
+  - 注册后进入: https://bigmodel.cn/usercenter/proj-mgmt/apikeys
+  - 单一API密钥支持所有GLM模型（GLM-4.6, GLM-4.5-x等）
 
 **注意**: 如果没有配置API密钥，系统会使用模拟数据进行演示。
 
@@ -124,7 +95,7 @@ npm run dev
 - **状态管理**: Zustand
 - **动画**: Framer Motion
 - **存储**: localStorage
-- **AI模型**: OpenRouter (DeepSeek V3/Qwen 2.5 7B) 或其他国产模型
+- **AI模型**: 智谱AI (GLM-4.6, GLM-4.5-x)
 - **日志**: Pino (高性能日志库)
 - **骰子系统**: 2D6 TRPG判定
 
@@ -152,9 +123,6 @@ npm run start
 2. 在 `lib/prompt-templates.ts` 添加对应的prompt模板
 3. 在 `components/character-form.tsx` 添加UI选项
 
-### 接入其他AI模型
-
-在 `lib/ai-service.ts` 中添加新的调用函数，并更新 `generateStory` 函数。
 
 ## ⚠️ 注意事项
 
@@ -174,7 +142,7 @@ MIT
 ## 🎉 致谢
 
 - Next.js团队提供的优秀框架
-- 国产大模型提供的AI能力
+- 智谱AI提供的AI能力
 - 所有开源组件的作者
 
 ---

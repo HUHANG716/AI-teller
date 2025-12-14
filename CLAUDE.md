@@ -30,7 +30,10 @@ npm run lint     # ESLint check
 - State persisted to localStorage via `lib/storage.ts`
 
 ### AI Integration
-- `lib/ai-service.ts`: Multi-provider support (OpenRouter/Qwen/Zhipu/Wenxin)
+- `lib/ai/`: AI service layer with Zhipu provider and mock fallback
+- `lib/ai/index.ts`: Main orchestration with provider selection and fallback logic
+- `lib/ai/providers.ts`: Zhipu API implementation and mock provider
+- `lib/ai/config.ts`: Provider configuration and environment validation
 - `lib/prompt-templates.ts`: Genre-specific prompts with structured JSON output format
 - AI responses must follow strict JSON schema with `content`, `choices`, and optional fields (`goalOptions`, `resourceChanges`, `goalProgress`)
 
@@ -48,12 +51,11 @@ npm run lint     # ESLint check
 ## Environment Variables
 
 ```bash
-AI_MODEL_PROVIDER=openrouter  # or qwen, zhipu, wenxin
-AI_MODEL=deepseek-v3          # or qwen-2.5-7b
-OPENROUTER_API_KEY=xxx        # Required for OpenRouter
+AI_MODEL_PROVIDER=zhipu     # or mock (fallback when no API key)
+ZHIPU_API_KEY=xxx           # Required for Zhipu AI
 ```
 
-Without API keys, the system uses mock responses from `mockGenerateStory()`.
+Without API keys, the system automatically falls back to mock responses from `mockGenerateStory()`. The mock provider provides full gameplay functionality with placeholder stories.
 
 ## Adding New Genres
 
