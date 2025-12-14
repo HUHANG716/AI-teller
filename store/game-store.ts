@@ -87,6 +87,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
           history: [],
           userInput: '',
           isOpening: true,
+          roundNumber: 1,  // 第1轮
+          phase: 'opening', // 开场阶段
+          maxRounds: GAME_CONFIG.defaultMaxRounds,
           model: getCurrentModel(), // 传递当前选择的模型
         }),
       });
@@ -231,6 +234,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // After selecting goal, generate round 4 content
     try {
+      const nextRoundNumber = 4;
+      const phase = getGamePhase(nextRoundNumber, updatedGame.maxRounds);
+      
+      console.log('🎯 selectGoal: 生成第4轮内容', {
+        nextRoundNumber,
+        phase,
+        maxRounds: updatedGame.maxRounds
+      });
+      
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -241,7 +253,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
           userInput: `选择目标：${goal.description}`,
           isOpening: false,
           goal: gameGoal,
-          roundNumber: 4, // Now generating round 4
+          roundNumber: nextRoundNumber,
+          phase,
+          maxRounds: updatedGame.maxRounds,
           model: getCurrentModel(), // 传递当前选择的模型
         }),
       });
@@ -328,7 +342,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
           history: currentGame.storyNodes,
           userInput: '',
           isEnding: true,
+          phase: 'ending',
           goal: currentGame.goal,
+          roundNumber: currentGame.currentNodeIndex + 2, // 当前是结局轮
+          maxRounds: currentGame.maxRounds,
           model: getCurrentModel(), // 传递当前选择的模型
         }),
       });
@@ -426,6 +443,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const currentRound = currentGame.currentNodeIndex + 1;
     // Goal selection phase is only in round 3 (when currentNodeIndex = 2, making choice in round 3)
     const isGoalSelectionPhase = currentRound === 3 && !currentGame.goal;
+
+    console.log('🔵 [makeChoice] 开始处理选择:', {
+      currentNodeIndex: currentGame.currentNodeIndex,
+      currentRound,
+      totalNodes: currentGame.storyNodes.length,
+      choiceText: choiceText.substring(0, 30)
+    });
 
     gameLogger.info({
       choice: choiceText,
@@ -534,7 +558,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
         hasGoal: !!currentGame.goal,
         shouldShowGoalOptions: isGoalSelection,
         currentNodeIndex: currentGame.currentNodeIndex,
-        phase
+        maxRounds: currentGame.maxRounds,
+        phase,
+        GAME_CONFIG_openingRounds: GAME_CONFIG.openingRounds,
+        GAME_CONFIG_goalSelectionRound: GAME_CONFIG.goalSelectionRound,
+        phaseCalculation: {
+          'nextRoundNumber <= openingRounds': nextRoundNumber <= GAME_CONFIG.openingRounds,
+          'nextRoundNumber === goalSelectionRound': nextRoundNumber === GAME_CONFIG.goalSelectionRound,
+          'nextRoundNumber >= maxRounds': nextRoundNumber >= currentGame.maxRounds,
+          'isClimax': nextRoundNumber >= currentGame.maxRounds - GAME_CONFIG.climaxRoundsBeforeEnd + 1
+        }
       });
 
       // Call API to generate next story segment
@@ -673,11 +706,24 @@ export const useGameStore = create<GameStore>((set, get) => ({
         goalProgress: updatedGame.goal?.progress.percentage
       }, 'Choice processed, pending node ready');
 
-      // 设置 pendingNode，等待用户点击"继续"
-      // 注意：不清除 currentDiceRoll，让骰子结果继续显示，等 confirmContinue 时再清除
+      // 设置 pendingNode
+      // 如果是序章阶段（不需要骰子判定），自动进入下一轮；否则等待用户点击"继续"
       set({ currentGame: updatedGame, isLoading: false, pendingNode: newNode });
 
-      // 不再自动检查结局，等用户点击"继续"后再检查
+      // 序章阶段（前3轮）自动确认继续，无需等待用户点击
+      if (isProloguePhase) {
+        console.log('📖 序章阶段，自动进入下一轮', {
+          currentRound,
+          isProloguePhase,
+          currentNodeIndexBefore: get().currentGame?.currentNodeIndex
+        });
+        await get().confirmContinue();
+        console.log('📖 confirmContinue完成后:', {
+          currentNodeIndexAfter: get().currentGame?.currentNodeIndex,
+          totalNodes: get().currentGame?.storyNodes.length
+        });
+      }
+      // 否则等用户在骰子弹窗中点击"继续"按钮（注意：不清除 currentDiceRoll，让骰子结果继续显示，等 confirmContinue 时再清除）
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       const errorStack = error instanceof Error ? error.stack : undefined;
@@ -741,11 +787,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { currentGame, pendingNode } = get();
 
     if (!currentGame || !pendingNode) {
-      console.warn('⚠️ confirmContinue: 没有 pendingNode 或 currentGame');
+      console.warn('⚠️ confirmContinue: 没有 pendingNode 或 currentGame', {
+        hasCurrentGame: !!currentGame,
+        hasPendingNode: !!pendingNode,
+        currentNodeIndex: currentGame?.currentNodeIndex
+      });
       return;
     }
 
-    console.log('▶️ 用户点击继续，进入下一轮');
+    console.log('▶️ confirmContinue: 将pendingNode添加到storyNodes', {
+      currentNodeIndexBefore: currentGame.currentNodeIndex,
+      totalNodesBefore: currentGame.storyNodes.length,
+      pendingNodeId: pendingNode.id
+    });
 
     // 将 pendingNode 添加到 storyNodes，更新 currentNodeIndex
     const updatedGame: GameState = {
@@ -754,6 +808,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentNodeIndex: currentGame.currentNodeIndex + 1,
       updatedAt: Date.now(),
     };
+
+    console.log('▶️ confirmContinue: 更新后的状态', {
+      currentNodeIndexAfter: updatedGame.currentNodeIndex,
+      totalNodesAfter: updatedGame.storyNodes.length
+    });
 
     // Save to localStorage
     saveGame(updatedGame);

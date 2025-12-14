@@ -58,7 +58,9 @@ export default function ChoiceButtons({ choices, onSelect, disabled }: ChoiceBut
 
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-xl" title="需要骰子判定">🎲</span>
+                  {difficulty && (
+                    <span className="text-xl" title="需要骰子判定">🎲</span>
+                  )}
                   <span className="text-gray-200 group-hover:text-white transition-colors flex-1">
                     {text}
                   </span>

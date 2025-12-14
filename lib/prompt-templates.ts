@@ -47,10 +47,12 @@ export const PROLOGUE_OUTPUT_FORMAT = `
   ]
 }
 
-【序章阶段说明】：
-- 这是序章阶段，选项不需要骰子判定
+【序章阶段 - 重要说明】：
+- 这是序章阶段（前3轮），选项**不需要骰子判定**
+- **绝对不要在choices中包含difficulty字段**
 - 选项应该是叙事性的探索和互动
 - 为后续的目标选择铺垫
+- JSON格式中每个choice对象只能有text字段，不能有difficulty字段
 `;
 
 // Output format with goal progress (for rounds after goal is selected)
@@ -173,21 +175,23 @@ function getPhasePrompt(phase: GamePhase, roundNumber: number, maxRounds: number
 - 这是故事的开场，建立世界观和初始场景
 - 介绍主角所处的环境和初始状态
 - 埋下一些伏笔，但不要急于推进主线
-- 选项应该是探索性的，让玩家了解这个世界`;
+- **选项应该是叙事性的探索，不需要难度值（difficulty），不需要骰子判定**`;
       } else {
         return `
 【序章 · 第二章：铺垫】
 - 这是故事的铺垫阶段，展开背景设定
 - 可以引入重要的配角或势力
 - 制造一些悬念或冲突的苗头
-- 为即将到来的目标选择做铺垫`;
+- 为即将到来的目标选择做铺垫
+- **选项应该是叙事性的探索，不需要难度值（difficulty），不需要骰子判定**`;
       }
 
     case 'goal-selection':
       return `
 【序章 · 第三章：抉择】第${roundNumber}/${maxRounds}轮
 - 这是目标选择轮，玩家将确定冒险目标
-- 总结前两章的铺垫，自然引出目标方向`;
+- 总结前两章的铺垫，自然引出目标方向
+- **这一轮不提供普通选项，只提供目标选项（goalOptions）**`;
 
     case 'development':
       const currentAdventureRound = roundNumber - GAME_CONFIG.goalSelectionRound;
@@ -249,6 +253,7 @@ export const GENRE_PROMPTS: Record<Genre, GenrePrompt> = {
 4. 埋下一些伏笔，但不要急于推进主线
 
 然后提供3个探索性选择让玩家做出第一个决定。
+**注意：这是序章阶段，选项不需要difficulty字段，不需要骰子判定！**
 
 ${PROLOGUE_OUTPUT_FORMAT}`,
 
@@ -268,9 +273,17 @@ ${PROLOGUE_OUTPUT_FORMAT}`,
       }
 
       const phasePrompt = getPhasePrompt(phase, roundNumber, maxRounds);
-      // 序章阶段使用无骰子的格式，正式冒险阶段根据是否有目标选择格式
-      const isPrologue = phase === 'opening';
+      // 序章阶段（包括开场和目标选择）使用无骰子的格式，正式冒险阶段根据是否有目标选择格式
+      const isPrologue = phase === 'opening' || phase === 'goal-selection';
       const outputFormat = isPrologue ? PROLOGUE_OUTPUT_FORMAT : (goal ? OUTPUT_FORMAT_WITH_GOAL : OUTPUT_FORMAT);
+
+      console.log('🎮 [武侠] 格式选择:', {
+        roundNumber,
+        phase,
+        isPrologue,
+        hasGoal: !!goal,
+        formatType: isPrologue ? 'PROLOGUE(无难度)' : (goal ? 'WITH_GOAL(有难度)' : 'NORMAL(有难度)')
+      });
 
       return `
 角色信息：
@@ -284,7 +297,7 @@ ${historyText}
 请根据玩家的选择继续推进故事：
 1. 承接上文，让剧情自然发展
 2. 制造新的冲突或转折
-3. 保持武侠世界的真实感${goal ? '\n4. 围绕当前目标推进剧情，更新目标进度' : ''}
+3. 保持武侠世界的真实感${goal ? '\n4. 围绕当前目标推进剧情，更新目标进度' : ''}${isPrologue ? '\n\n**重要提醒：当前是序章阶段（前3轮），选项不需要difficulty字段，不需要骰子判定！**' : ''}
 
 然后提供3个新的选择（高潮阶段只提供2个关键选择）。
 
@@ -387,6 +400,7 @@ ${ENDING_OUTPUT_FORMAT}`;
 4. 埋下一些伏笔，但保持神秘感
 
 然后提供3个探索性选择。
+**注意：这是序章阶段，选项不需要difficulty字段，不需要骰子判定！**
 
 ${PROLOGUE_OUTPUT_FORMAT}`,
 
@@ -406,8 +420,8 @@ ${PROLOGUE_OUTPUT_FORMAT}`,
       }
 
       const phasePrompt = getPhasePrompt(phase, roundNumber, maxRounds);
-      // 序章阶段使用无骰子的格式，正式冒险阶段根据是否有目标选择格式
-      const isPrologue = phase === 'opening';
+      // 序章阶段（包括开场和目标选择）使用无骰子的格式，正式冒险阶段根据是否有目标选择格式
+      const isPrologue = phase === "opening" || phase === 'goal-selection';
       const outputFormat = isPrologue ? PROLOGUE_OUTPUT_FORMAT : (goal ? OUTPUT_FORMAT_WITH_GOAL : OUTPUT_FORMAT);
 
       return `
@@ -422,7 +436,7 @@ ${historyText}
 请根据玩家的选择继续推进故事：
 1. 让剧情自然发展，但加深悬疑感
 2. 可以揭示一些线索，但保留更多谜团
-3. 营造紧张或不安的氛围${goal ? '\n4. 围绕当前目标推进剧情，更新目标进度' : ''}
+3. 营造紧张或不安的氛围${goal ? '\n4. 围绕当前目标推进剧情，更新目标进度' : ''}${isPrologue ? '\n\n**重要提醒：当前是序章阶段（前3轮），选项不需要difficulty字段，不需要骰子判定！**' : ''}
 
 然后提供3个新的选择（高潮阶段只提供2个关键选择）。
 
@@ -524,6 +538,7 @@ ${ENDING_OUTPUT_FORMAT}`;
 4. 埋下一些利益纠葛的伏笔
 
 然后提供3个探索性选择。
+**注意：这是序章阶段，选项不需要difficulty字段，不需要骰子判定！**
 
 ${PROLOGUE_OUTPUT_FORMAT}`,
 
@@ -543,8 +558,8 @@ ${PROLOGUE_OUTPUT_FORMAT}`,
       }
 
       const phasePrompt = getPhasePrompt(phase, roundNumber, maxRounds);
-      // 序章阶段使用无骰子的格式，正式冒险阶段根据是否有目标选择格式
-      const isPrologue = phase === 'opening';
+      // 序章阶段（包括开场和目标选择）使用无骰子的格式，正式冒险阶段根据是否有目标选择格式
+      const isPrologue = phase === 'opening' || phase === 'goal-selection';
       const outputFormat = isPrologue ? PROLOGUE_OUTPUT_FORMAT : (goal ? OUTPUT_FORMAT_WITH_GOAL : OUTPUT_FORMAT);
 
       return `
@@ -559,7 +574,7 @@ ${historyText}
 请根据玩家的选择继续黑帮故事：
 1. 展现权力斗争和利益纷争
 2. 制造新的冲突或揭示背叛
-3. 对话要犀利有力${goal ? '\n4. 围绕当前目标推进剧情，更新目标进度' : ''}
+3. 对话要犀利有力${goal ? '\n4. 围绕当前目标推进剧情，更新目标进度' : ''}${isPrologue ? '\n\n**重要提醒：当前是序章阶段（前3轮），选项不需要difficulty字段，不需要骰子判定！**' : ''}
 
 然后提供3个新的选择（高潮阶段只提供2个关键选择）。
 
@@ -656,7 +671,19 @@ export function buildPrompt(
   const genrePrompt = GENRE_PROMPTS[genre];
   const actualMaxRounds = maxRounds ?? GAME_CONFIG.defaultMaxRounds;
   const actualRound = roundNumber ?? history.length + 1;
-  const actualPhase = phase ?? 'development';
+  const actualPhase = phase;
+if (!actualPhase) {
+  throw new Error('phase is required');
+}
+  console.log('📝 [buildPrompt] 参数:', {
+    genre,
+    roundNumber: actualRound,
+    phase: actualPhase,
+    isOpening,
+    isGoalSelection,
+    isEnding,
+    hasGoal: !!goal
+  });
 
   let userPrompt: string;
 

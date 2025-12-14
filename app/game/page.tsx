@@ -143,62 +143,8 @@ export default function GamePage() {
           </div>
         )}
 
-        {/* 显示当前轮的选择结果和"继续"按钮（当有 pendingNode 时） */}
-        {pendingNode && !isLoading && (
-          <div className="mb-6 space-y-4">
-            {/* 当前轮的选择 */}
-            {currentNode.userChoice && (
-              <div className="p-4 bg-blue-900/30 rounded-lg border border-blue-500/30">
-                <span className="text-blue-300 text-sm">你的选择：</span>
-                <span className="text-white ml-2">{currentNode.userChoice}</span>
-              </div>
-            )}
-
-            {/* 骰子结果 */}
-            {currentNode.diceRoll && (
-              <div className="p-4 bg-purple-900/30 rounded-lg border border-purple-500/30">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">🎲</span>
-                  <div>
-                    <p className="text-purple-200">
-                      掷骰结果：{currentNode.diceRoll.dice1} + {currentNode.diceRoll.dice2} = {currentNode.diceRoll.total}
-                      {' '}(难度 {currentNode.diceRoll.difficulty})
-                    </p>
-                    <p className={`text-sm font-medium ${
-                      currentNode.diceRoll.outcome === 'critical-success' ? 'text-yellow-400' :
-                      currentNode.diceRoll.outcome === 'perfect' ? 'text-green-400' :
-                      currentNode.diceRoll.outcome === 'success' ? 'text-green-300' :
-                      currentNode.diceRoll.outcome === 'fail' ? 'text-red-300' :
-                      'text-red-500'
-                    }`}>
-                      {currentNode.diceRoll.outcome === 'critical-success' ? '大成功！' :
-                       currentNode.diceRoll.outcome === 'perfect' ? '完美成功！' :
-                       currentNode.diceRoll.outcome === 'success' ? '成功' :
-                       currentNode.diceRoll.outcome === 'fail' ? '失败' :
-                       '大失败！'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 继续按钮 */}
-            <button
-              onClick={confirmContinue}
-              className="w-full py-4 bg-gradient-to-r from-blue-600 to-purple-600
-                       hover:from-blue-500 hover:to-purple-500
-                       text-white font-medium text-lg rounded-xl
-                       transition-all duration-200 shadow-lg hover:shadow-xl
-                       flex items-center justify-center gap-2"
-            >
-              <span>继续冒险</span>
-              <span className="text-xl">→</span>
-            </button>
-          </div>
-        )}
-
-        {/* 显示上一轮的选择（只在没有 pendingNode 时显示） */}
-        {!pendingNode && currentGame.currentNodeIndex > 0 && currentGame.storyNodes[currentGame.currentNodeIndex - 1]?.userChoice && (
+        {/* 显示上一轮的选择 */}
+        {currentGame.currentNodeIndex > 0 && currentGame.storyNodes[currentGame.currentNodeIndex - 1]?.userChoice && (
           <div className="mb-4 p-3 bg-blue-900/30 rounded-lg border border-blue-500/30">
             <span className="text-blue-300 text-sm">你的选择：</span>
             <span className="text-white ml-2">
@@ -222,7 +168,7 @@ export default function GamePage() {
         </div>
 
         {/* Goal Selection (Round 3) */}
-        {isRound3GoalSelection && showChoices && !isLoading && !isGameEnded && !pendingNode && goalOptions && (
+        {isRound3GoalSelection && showChoices && !isLoading && !isGameEnded && goalOptions && (
           <GoalSelection
             goals={goalOptions}
             onSelect={async (goal) => {
@@ -234,7 +180,7 @@ export default function GamePage() {
         )}
 
         {/* Regular Choices */}
-        {!isRound3GoalSelection && showChoices && !isLoading && !isGameEnded && !pendingNode && (
+        {!isRound3GoalSelection && showChoices && !isLoading && !isGameEnded && (
           <div className="space-y-4">
             <h2 className="text-xl font-medium text-gray-300 mb-4">你会如何选择？</h2>
 

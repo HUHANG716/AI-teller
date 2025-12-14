@@ -17,10 +17,39 @@ export const GAME_CONFIG = {
 export type GamePhase = 'opening' | 'goal-selection' | 'development' | 'climax' | 'ending';
 
 export function getGamePhase(roundNumber: number, maxRounds: number): GamePhase {
-  if (roundNumber <= GAME_CONFIG.openingRounds) return 'opening';
-  if (roundNumber === GAME_CONFIG.goalSelectionRound) return 'goal-selection';
-  if (roundNumber >= maxRounds) return 'ending';
-  if (roundNumber >= maxRounds - GAME_CONFIG.climaxRoundsBeforeEnd + 1) return 'climax';
+  const checks = {
+    roundNumber,
+    maxRounds,
+    openingRounds: GAME_CONFIG.openingRounds,
+    goalSelectionRound: GAME_CONFIG.goalSelectionRound,
+    climaxRoundsBeforeEnd: GAME_CONFIG.climaxRoundsBeforeEnd,
+    isOpening: roundNumber <= GAME_CONFIG.openingRounds,
+    isGoalSelection: roundNumber === GAME_CONFIG.goalSelectionRound,
+    isEnding: roundNumber >= maxRounds,
+    isClimax: roundNumber >= maxRounds - GAME_CONFIG.climaxRoundsBeforeEnd + 1,
+    climaxThreshold: maxRounds - GAME_CONFIG.climaxRoundsBeforeEnd + 1
+  };
+  
+  console.log('🎭 [getGamePhase] 计算阶段:', checks);
+  
+  if (roundNumber <= GAME_CONFIG.openingRounds) {
+    console.log('🎭 [getGamePhase] 返回: opening');
+    return 'opening';
+  }
+  if (roundNumber === GAME_CONFIG.goalSelectionRound) {
+    console.log('🎭 [getGamePhase] 返回: goal-selection');
+    return 'goal-selection';
+  }
+  if (roundNumber >= maxRounds) {
+    console.log('🎭 [getGamePhase] 返回: ending');
+    return 'ending';
+  }
+  if (roundNumber >= maxRounds - GAME_CONFIG.climaxRoundsBeforeEnd + 1) {
+    console.log('🎭 [getGamePhase] 返回: climax');
+    return 'climax';
+  }
+
+  console.log('🎭 [getGamePhase] 返回: development');
   return 'development';
 }
 

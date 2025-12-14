@@ -1,7 +1,7 @@
 // API route for AI story generation
 import { NextRequest, NextResponse } from 'next/server';
 import { generateStory, mockGenerateStory, ZhipuModel } from '@/lib/ai-service';
-import { Genre, Character, StoryNode, DiceRoll, GameGoal } from '@/lib/types';
+import { Genre, Character, StoryNode, DiceRoll, GameGoal, GamePhase } from '@/lib/types';
 import { apiLogger } from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
@@ -20,7 +20,8 @@ export async function POST(req: NextRequest) {
       roundNumber,
       isGoalSelection,
       isEnding,
-      model  // 🔴 关键：从请求体解构 model
+      model, // 🔴 关键：从请求体解构 model
+      phase 
     } = body as {
       genre: Genre;
       character: Character;
@@ -33,6 +34,7 @@ export async function POST(req: NextRequest) {
       isGoalSelection?: boolean;
       isEnding?: boolean;
       model?: ZhipuModel;  // 🔴 添加类型定义
+      phase?: GamePhase;
     };
     
     // 🔍 Debug: 打印接收到的 model 参数
@@ -62,19 +64,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Use mock for development if no API key is configured
-    const useMock = !process.env.OPENROUTER_API_KEY &&
-                     !process.env.QWEN_API_KEY &&
-                     !process.env.ZHIPU_API_KEY &&
-                     !process.env.WENXIN_API_KEY;
+  
 
-    if (useMock) {
-      apiLogger.debug('Using mock AI response (no API key configured)');
-    }
 
-    const result = useMock
-      ? await mockGenerateStory({ genre, character, history, userInput, isOpening, diceRoll })
-      : await generateStory({
+    const result = await generateStory({
           genre,
           character,
           history,
@@ -85,7 +78,8 @@ export async function POST(req: NextRequest) {
           roundNumber,
           isGoalSelection,
           isEnding,
-          model
+          model,
+          phase 
         });
 
     const duration = Date.now() - startTime;
